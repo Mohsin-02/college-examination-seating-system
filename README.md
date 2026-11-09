@@ -245,23 +245,23 @@ for demonstration and testing purposes.
 
 ### 1. Admin Dashboard
 
-![Admin Dashboard](screenshots/01-dashboard.png)
+![Admin Dashboard](screenshots/01-dashboard.jpg)
 
 ### 2. Student Management
 
-![Student Management](screenshots/02-student-management.png)
+![Student Management](screenshots/02-student-management.jpg)
 
 ### 3. Examination Seating Arrangement
 
-![Seating Arrangement](screenshots/03-seating-arrangement.png)
+![Seating Arrangement](screenshots/03-seating-arrangement.jpg)
 
 ### 4. Faculty Management
 
-![Faculty Management](screenshots/04-faculty-management.png)
+![Faculty Management](screenshots/04-faculty-management.jpg)
 
 ### 5. Block and Room Management
 
-![Block and Room Management](screenshots/05-block-room-management.png)
+![Block and Room Management](screenshots/05-block-room-management.jpg)
 
 ---
 
