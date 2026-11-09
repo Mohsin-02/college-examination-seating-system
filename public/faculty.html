@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Faculty — Seating System</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app-layout">
+  <div class="main-content">
+    <div class="top-bar">
+      <h1 class="page-title">👨‍🏫 Faculty Management</h1>
+      <div class="top-bar-actions">
+        <button class="btn btn-primary btn-sm" onclick="openFacultyModal()">+ Add Faculty</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- Stats -->
+      <div class="stats-grid" id="facultyStats"></div>
+
+      <div class="card">
+        <div class="card-header">
+          <span>👥</span>
+          <h3>All Faculty</h3>
+          <div class="actions">
+            <select id="filterAvail" onchange="loadFaculty()">
+              <option value="">All</option>
+              <option value="1">Available</option>
+              <option value="0">Unavailable</option>
+            </select>
+          </div>
+        </div>
+        <div class="card-body" style="padding-bottom:0;">
+          <div class="search-bar">
+            <div class="search-input" style="max-width:280px;">
+              <input type="text" id="searchInput" placeholder="Search by name or ID...">
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="loadFaculty()">🔄 Refresh</button>
+          </div>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Emp ID</th>
+                <th>Name</th>
+                <th>Department</th>
+                <th>Phone</th>
+                <th>Availability</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="facultyTable">
+              <tr><td colspan="7"><div class="loading"><div class="spinner"></div></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Faculty Modal -->
+<div class="modal-overlay" id="facultyModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="facModalTitle">Add Faculty</h3>
+      <button class="modal-close" onclick="closeModal('facultyModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="facId">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Employee ID *</label>
+          <input type="text" id="empId" placeholder="EMP001" style="text-transform:uppercase;">
+        </div>
+        <div class="form-group">
+          <label>Department *</label>
+          <select id="facDept">
+            <option value="">Select Department</option>
+            <optgroup label="Engineering">
+              <option>CSE</option>
+              <option>CSE-DS</option>
+              <option>CSE-AIML</option>
+              <option>CSE-AIDS</option>
+              <option>IT</option>
+              <option>ECE</option>
+              <option>EEE</option>
+              <option>Mechanical</option>
+              <option>Civil</option>
+            </optgroup>
+            <optgroup label="Management">
+              <option>MBA</option>
+            </optgroup>
+            <optgroup label="Sciences">
+              <option>Mathematics</option>
+              <option>Physics</option>
+              <option>Chemistry</option>
+              <option>English</option>
+            </optgroup>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Full Name *</label>
+        <input type="text" id="facName" placeholder="Dr. / Prof. Full Name">
+      </div>
+      <div class="form-group">
+        <label>Phone Number</label>
+        <input type="tel" id="facPhone" placeholder="10-digit mobile number">
+      </div>
+      <div class="form-group" style="display:flex; align-items:center; gap:.75rem;">
+        <input type="checkbox" id="facAvail" style="width:auto;" checked>
+        <label for="facAvail" style="margin:0; text-transform:none; font-size:.9rem; font-weight:400;">
+          Available for exam duty
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('facultyModal')">Cancel</button>
+      <button class="btn btn-primary" id="saveFacBtn" onclick="saveFaculty()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/sidebar.js"></script>
+<script src="/js/common.js"></script>
+<script>
+let allFaculty = [];
+
+async function loadFaculty() {
+  const avail = document.getElementById('filterAvail').value;
+  let url = '/api/faculty' + (avail !== '' ? `?available=${avail}` : '');
+  document.getElementById('facultyTable').innerHTML =
+    '<tr><td colspan="7"><div class="loading"><div class="spinner"></div></div></td></tr>';
+
+  try {
+    allFaculty = await API.get(url) || [];
+    renderTable(allFaculty);
+
+    // Stats
+    const stats = await API.get('/api/faculty/stats');
+    document.getElementById('facultyStats').innerHTML = `
+      <div class="stat-card">
+        <div class="stat-icon navy">👥</div>
+        <div class="stat-info">
+          <div class="label">Total Faculty</div>
+          <div class="value">${stats.total}</div>
+          <div class="sub">All departments</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green">✅</div>
+        <div class="stat-info">
+          <div class="label">Available</div>
+          <div class="value">${stats.available}</div>
+          <div class="sub">For duty</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon red">❌</div>
+        <div class="stat-info">
+          <div class="label">Unavailable</div>
+          <div class="value">${stats.unavailable}</div>
+          <div class="sub">On leave / off</div>
+        </div>
+      </div>
+    `;
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+function renderTable(faculty) {
+  if (!faculty.length) {
+    document.getElementById('facultyTable').innerHTML =
+      '<tr><td colspan="7"><div class="empty-state"><div class="icon">👨‍🏫</div><h3>No faculty found</h3></div></td></tr>';
+    return;
+  }
+  document.getElementById('facultyTable').innerHTML = faculty.map((f, i) => `
+    <tr>
+      <td class="text-xs text-gray">${i+1}</td>
+      <td><span class="font-mono fw-600">${f.emp_id}</span></td>
+      <td>${f.name}</td>
+      <td><span class="badge badge-navy">${f.department}</span></td>
+      <td class="font-mono text-sm">${f.phone || '—'}</td>
+      <td>
+        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
+          <input type="checkbox" ${f.available ? 'checked' : ''}
+            onchange="toggleAvailability(${f.id}, this.checked)"
+            style="width:auto;cursor:pointer;">
+          ${availBadge(f.available)}
+        </label>
+      </td>
+      <td>
+        <button class="btn btn-outline btn-sm" onclick="editFaculty(${f.id})">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteFaculty(${f.id}, '${f.name}')">🗑️</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadFaculty();
+  document.getElementById('searchInput').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    renderTable(allFaculty.filter(f =>
+      f.name.toLowerCase().includes(q) || f.emp_id.toLowerCase().includes(q)
+    ));
+  });
+});
+
+function openFacultyModal() {
+  document.getElementById('facId').value = '';
+  document.getElementById('empId').value = '';
+  document.getElementById('facName').value = '';
+  document.getElementById('facDept').value = '';
+  document.getElementById('facPhone').value = '';
+  document.getElementById('facAvail').checked = true;
+  document.getElementById('facModalTitle').textContent = 'Add Faculty';
+  openModal('facultyModal');
+}
+
+async function editFaculty(id) {
+  try {
+    const f = await API.get(`/api/faculty/${id}`);
+    document.getElementById('facId').value    = f.id;
+    document.getElementById('empId').value    = f.emp_id;
+    document.getElementById('facName').value  = f.name;
+    document.getElementById('facDept').value  = f.department;
+    document.getElementById('facPhone').value = f.phone;
+    document.getElementById('facAvail').checked = !!f.available;
+    document.getElementById('facModalTitle').textContent = 'Edit Faculty';
+    openModal('facultyModal');
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function saveFaculty() {
+  const id   = document.getElementById('facId').value;
+  const body = {
+    emp_id:     document.getElementById('empId').value.trim().toUpperCase(),
+    name:       document.getElementById('facName').value.trim(),
+    department: document.getElementById('facDept').value,
+    phone:      document.getElementById('facPhone').value.trim(),
+    available:  document.getElementById('facAvail').checked
+  };
+  if (!body.emp_id || !body.name || !body.department)
+    return showToast('Emp ID, name and department required', 'error');
+
+  setLoading('saveFacBtn', true);
+  try {
+    if (id) {
+      await API.put(`/api/faculty/${id}`, body);
+      showToast('Faculty updated', 'success');
+    } else {
+      await API.post('/api/faculty', body);
+      showToast('Faculty added', 'success');
+    }
+    closeModal('facultyModal');
+    loadFaculty();
+  } catch(e) { showToast(e.message, 'error'); }
+  finally { setLoading('saveFacBtn', false); }
+}
+
+async function toggleAvailability(id, avail) {
+  try {
+    await API.patch(`/api/faculty/${id}/availability`, { available: avail });
+    showToast(`Availability updated`, 'success');
+    loadFaculty();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function deleteFaculty(id, name) {
+  if (!confirmAction(`Delete faculty "${name}"?`)) return;
+  try {
+    await API.delete(`/api/faculty/${id}`);
+    showToast('Faculty deleted', 'success');
+    loadFaculty();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+</script>
+</body>
+</html>

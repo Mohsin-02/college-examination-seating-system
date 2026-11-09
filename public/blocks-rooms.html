@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blocks & Rooms — Seating System</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .blocks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px,1fr)); gap:1.25rem; }
+    .block-card { background:var(--white); border:1px solid var(--gray-200); border-radius:var(--radius-lg); overflow:hidden; }
+    .block-card.disabled { opacity: .6; }
+    .block-header {
+      background: var(--navy); color: white;
+      padding: .9rem 1.25rem; display:flex; align-items:center; gap:.75rem;
+    }
+    .block-card.disabled .block-header { background: var(--gray-600); }
+    .block-badge {
+      width:38px;height:38px; background:var(--gold); color:var(--navy);
+      border-radius:8px; display:flex; align-items:center; justify-content:center;
+      font-family:'Playfair Display',serif; font-weight:700; font-size:1.1rem; flex-shrink:0;
+    }
+    .block-card.disabled .block-badge { background: var(--gray-300); color: var(--gray-600); }
+    .block-meta h4 { font-size:.9rem; }
+    .block-meta span { font-size:.72rem; color:var(--gold); }
+    .block-card.disabled .block-meta span { color:var(--gray-300); }
+    .block-actions { margin-left:auto; display:flex; gap:.4rem; align-items:center; }
+    .toggle-switch {
+      position:relative; display:inline-block; width:40px; height:22px; cursor:pointer;
+    }
+    .toggle-switch input { opacity:0; width:0; height:0; }
+    .toggle-track {
+      position:absolute; inset:0;
+      background:rgba(255,255,255,.3); border-radius:99px; transition:.3s;
+    }
+    .toggle-track::before {
+      content:''; position:absolute;
+      height:16px; width:16px; left:3px; bottom:3px;
+      background:white; border-radius:50%; transition:.3s;
+    }
+    input:checked + .toggle-track { background: var(--green); }
+    input:checked + .toggle-track::before { transform: translateX(18px); }
+
+    .room-list { padding:.65rem .85rem; }
+    .room-row {
+      display:flex; align-items:center; gap:.65rem;
+      padding:.45rem .65rem; border-radius:6px;
+      border:1px solid var(--gray-100); margin-bottom:.35rem; background:var(--gray-50);
+    }
+    .room-row.disabled { opacity:.5; background:var(--gray-100); }
+    .room-no { font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--navy); font-size:.85rem; }
+    .room-cap { font-size:.72rem; color:var(--gray-600); }
+    .room-dims { font-size:.7rem; color:var(--gray-500); }
+    .room-actions { margin-left:auto; display:flex; gap:.3rem; align-items:center; }
+    .room-toggle { cursor:pointer; font-size:.85rem; padding:.15rem .4rem; border-radius:4px; border:none;
+      background:transparent; transition:var(--transition); }
+    .room-toggle:hover { background:var(--gray-200); }
+    .add-room-btn {
+      margin:.4rem .75rem .65rem; width:calc(100% - 1.5rem);
+      border:1.5px dashed var(--gray-300); background:transparent;
+      color:var(--gray-600); cursor:pointer; padding:.45rem;
+      border-radius:6px; font-size:.8rem; transition:var(--transition);
+    }
+    .add-room-btn:hover { border-color:var(--navy); color:var(--navy); }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div class="main-content">
+    <div class="top-bar">
+      <h1 class="page-title">🏛️ Blocks &amp; Rooms</h1>
+      <div class="top-bar-actions">
+        <button class="btn btn-outline btn-sm" onclick="enableAll()">✅ Enable All</button>
+        <button class="btn btn-outline btn-sm" onclick="disableAll()">🚫 Disable All</button>
+        <button class="btn btn-primary btn-sm" onclick="openBlockModal()">+ Add Block</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- Stats -->
+      <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);" id="roomStats"></div>
+
+      <div id="blocksGrid" class="blocks-grid">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Block Modal -->
+<div class="modal-overlay" id="blockModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="blockModalTitle">Add Block</h3>
+      <button class="modal-close" onclick="closeModal('blockModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="blockId">
+      <div class="form-group">
+        <label>Block Name *</label>
+        <input type="text" id="blockName" placeholder="e.g. A, B, C, LAB" style="text-transform:uppercase;">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('blockModal')">Cancel</button>
+      <button class="btn btn-primary" id="saveBlockBtn" onclick="saveBlock()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Room Modal -->
+<div class="modal-overlay" id="roomModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="roomModalTitle">Add Room</h3>
+      <button class="modal-close" onclick="closeModal('roomModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="roomId">
+      <div class="form-group">
+        <label>Block</label>
+        <select id="roomBlock"></select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Room Number *</label>
+          <input type="text" id="roomNo" placeholder="e.g. A203" style="text-transform:uppercase;">
+        </div>
+        <div class="form-group">
+          <label>Capacity *</label>
+          <input type="number" id="roomCap" placeholder="30" min="1" max="200">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Bench Rows (front→back)</label>
+          <input type="number" id="roomRows" placeholder="8" min="1" max="20" value="8">
+        </div>
+        <div class="form-group">
+          <label>Bench Columns</label>
+          <input type="number" id="roomCols" placeholder="4" min="1" max="8" value="4">
+        </div>
+      </div>
+      <div class="text-xs text-gray" style="margin-top:-.5rem; margin-bottom:.75rem;">
+        Mid capacity = rows × cols × 2 &nbsp;·&nbsp; Semester capacity = rows × cols
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('roomModal')">Cancel</button>
+      <button class="btn btn-primary" id="saveRoomBtn" onclick="saveRoom()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/sidebar.js"></script>
+<script src="/js/common.js"></script>
+<script>
+let blocksData = [], allRooms = [];
+
+async function loadAll() {
+  try {
+    [blocksData, allRooms] = await Promise.all([API.get('/api/blocks'), API.get('/api/rooms')]);
+    renderStats();
+    renderBlocks();
+    populateBlockSelect();
+  } catch(e) { showToast(e.message,'error'); }
+}
+
+function renderStats() {
+  const totalBlocks   = blocksData.length;
+  const enabledBlocks = blocksData.filter(b=>b.enabled).length;
+  const totalRooms    = allRooms.length;
+  const enabledRooms  = allRooms.filter(r=>r.enabled).length;
+  const totalCap      = allRooms.filter(r=>r.enabled).reduce((s,r)=>s+r.capacity,0);
+  document.getElementById('roomStats').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-icon navy">🏛️</div>
+      <div class="stat-info">
+        <div class="label">Blocks</div>
+        <div class="value">${totalBlocks}</div>
+        <div class="sub">${enabledBlocks} enabled</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon gold">🚪</div>
+      <div class="stat-info">
+        <div class="label">Rooms</div>
+        <div class="value">${totalRooms}</div>
+        <div class="sub">${enabledRooms} enabled</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon green">🪑</div>
+      <div class="stat-info">
+        <div class="label">Active Capacity</div>
+        <div class="value">${totalCap}</div>
+        <div class="sub">Enabled rooms only</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon red">🚫</div>
+      <div class="stat-info">
+        <div class="label">Disabled</div>
+        <div class="value">${totalRooms - enabledRooms}</div>
+        <div class="sub">Won't be used in plans</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderBlocks() {
+  if (!blocksData.length) {
+    document.getElementById('blocksGrid').innerHTML =
+      '<div class="empty-state" style="grid-column:1/-1"><div class="icon">🏛️</div><h3>No blocks yet</h3></div>';
+    return;
+  }
+  document.getElementById('blocksGrid').innerHTML = blocksData.map(block => {
+    const rooms       = allRooms.filter(r => r.block_id === block.id);
+    const enabledRooms = rooms.filter(r => r.enabled).length;
+    const cap         = rooms.filter(r=>r.enabled).reduce((s,r)=>s+r.capacity,0);
+    return `
+      <div class="block-card ${block.enabled ? '' : 'disabled'}" id="block-card-${block.id}">
+        <div class="block-header">
+          <div class="block-badge">${block.name}</div>
+          <div class="block-meta">
+            <h4>Block ${block.name}</h4>
+            <span>${rooms.length} rooms &nbsp;·&nbsp; ${enabledRooms} enabled &nbsp;·&nbsp; ${cap} active seats</span>
+          </div>
+          <div class="block-actions">
+            <!-- Block toggle -->
+            <label class="toggle-switch" title="${block.enabled?'Disable':'Enable'} block">
+              <input type="checkbox" ${block.enabled?'checked':''} onchange="toggleBlock(${block.id}, this.checked)">
+              <span class="toggle-track"></span>
+            </label>
+            <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:white;border:none;"
+              onclick="editBlock(${block.id},'${block.name}')">✏️</button>
+            <button class="btn btn-sm" style="background:rgba(220,38,38,.4);color:white;border:none;"
+              onclick="deleteBlock(${block.id},'${block.name}')">🗑️</button>
+          </div>
+        </div>
+        <div class="room-list">
+          ${rooms.map(r => `
+            <div class="room-row ${r.enabled?'':'disabled'}" id="room-row-${r.id}">
+              <span class="room-no">${r.room_no}</span>
+              <span class="room-cap">🪑 ${r.capacity}</span>
+              <span class="room-dims">${r.num_rows||8}×${r.num_cols||4}</span>
+              <div class="room-actions">
+                <button class="room-toggle" onclick="toggleRoom(${r.id}, ${r.enabled?0:1})"
+                  title="${r.enabled?'Disable':'Enable'} room">
+                  ${r.enabled ? '✅' : '🚫'}
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="editRoom(${r.id})">✏️</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteRoom(${r.id},'${r.room_no}')">🗑️</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <button class="add-room-btn" onclick="openRoomModal(${block.id})">+ Add Room to Block ${block.name}</button>
+      </div>`;
+  }).join('');
+}
+
+function populateBlockSelect() {
+  document.getElementById('roomBlock').innerHTML =
+    '<option value="">Select Block</option>' +
+    blocksData.map(b => `<option value="${b.id}">Block ${b.name}</option>`).join('');
+}
+
+// ── Block CRUD ──────────────────────────────────────────────
+function openBlockModal() {
+  document.getElementById('blockId').value = '';
+  document.getElementById('blockName').value = '';
+  document.getElementById('blockModalTitle').textContent = 'Add Block';
+  openModal('blockModal');
+}
+function editBlock(id, name) {
+  document.getElementById('blockId').value = id;
+  document.getElementById('blockName').value = name;
+  document.getElementById('blockModalTitle').textContent = 'Edit Block';
+  openModal('blockModal');
+}
+async function saveBlock() {
+  const id   = document.getElementById('blockId').value;
+  const name = document.getElementById('blockName').value.trim().toUpperCase();
+  if (!name) return showToast('Block name required','error');
+  setLoading('saveBlockBtn',true);
+  try {
+    if (id) await API.put(`/api/blocks/${id}`,{name});
+    else    await API.post('/api/blocks',{name});
+    showToast(id?'Block updated':'Block added','success');
+    closeModal('blockModal'); loadAll();
+  } catch(e) { showToast(e.message,'error'); }
+  finally { setLoading('saveBlockBtn',false); }
+}
+async function deleteBlock(id, name) {
+  if (!confirmAction(`Delete Block ${name} and ALL its rooms?`)) return;
+  try { await API.delete(`/api/blocks/${id}`); showToast('Block deleted','success'); loadAll(); }
+  catch(e) { showToast(e.message,'error'); }
+}
+
+// ── Block toggle ─────────────────────────────────────────────
+async function toggleBlock(id, enabled) {
+  try {
+    await API.patch(`/api/blocks/${id}/toggle`, { enabled, cascade: false });
+    showToast(`Block ${enabled?'enabled':'disabled'}`, enabled?'success':'info');
+    loadAll();
+  } catch(e) { showToast(e.message,'error'); }
+}
+
+// ── Room CRUD ──────────────────────────────────────────────
+function openRoomModal(blockId) {
+  document.getElementById('roomId').value  = '';
+  document.getElementById('roomNo').value  = '';
+  document.getElementById('roomCap').value = 30;
+  document.getElementById('roomRows').value = 8;
+  document.getElementById('roomCols').value = 4;
+  document.getElementById('roomBlock').value = blockId || '';
+  document.getElementById('roomModalTitle').textContent = 'Add Room';
+  openModal('roomModal');
+}
+async function editRoom(id) {
+  const r = allRooms.find(x=>x.id===id);
+  if (!r) return;
+  document.getElementById('roomId').value   = r.id;
+  document.getElementById('roomNo').value   = r.room_no;
+  document.getElementById('roomCap').value  = r.capacity;
+  document.getElementById('roomRows').value = r.num_rows || 8;
+  document.getElementById('roomCols').value = r.num_cols || 4;
+  document.getElementById('roomBlock').value = r.block_id;
+  document.getElementById('roomModalTitle').textContent = 'Edit Room';
+  openModal('roomModal');
+}
+async function saveRoom() {
+  const id      = document.getElementById('roomId').value;
+  const block_id= document.getElementById('roomBlock').value;
+  const room_no = document.getElementById('roomNo').value.trim().toUpperCase();
+  const capacity= document.getElementById('roomCap').value;
+  const num_rows= document.getElementById('roomRows').value;
+  const num_cols= document.getElementById('roomCols').value;
+  if (!block_id||!room_no||!capacity) return showToast('All fields required','error');
+  setLoading('saveRoomBtn',true);
+  try {
+    if (id) await API.put(`/api/rooms/${id}`,{block_id,room_no,capacity,num_rows,num_cols});
+    else    await API.post('/api/rooms',{block_id,room_no,capacity,num_rows,num_cols});
+    showToast(id?'Room updated':'Room added','success');
+    closeModal('roomModal'); loadAll();
+  } catch(e) { showToast(e.message,'error'); }
+  finally { setLoading('saveRoomBtn',false); }
+}
+async function toggleRoom(id, enabled) {
+  try {
+    await API.patch(`/api/rooms/${id}/toggle`, { enabled });
+    showToast(`Room ${enabled?'enabled':'disabled'}`, enabled?'success':'info');
+    loadAll();
+  } catch(e) { showToast(e.message,'error'); }
+}
+async function deleteRoom(id, no) {
+  if (!confirmAction(`Delete room ${no}?`)) return;
+  try { await API.delete(`/api/rooms/${id}`); showToast('Room deleted','success'); loadAll(); }
+  catch(e) { showToast(e.message,'error'); }
+}
+
+// ── Bulk enable/disable ─────────────────────────────────────
+async function enableAll() {
+  if (!confirmAction('Enable ALL blocks and rooms?')) return;
+  try {
+    for (const b of blocksData) {
+      await API.patch(`/api/blocks/${b.id}/toggle`, { enabled: 1, cascade: true });
+    }
+    showToast('All blocks & rooms enabled','success'); loadAll();
+  } catch(e) { showToast(e.message,'error'); }
+}
+async function disableAll() {
+  if (!confirmAction('Disable ALL blocks and rooms? They won\'t be used in new plans.')) return;
+  try {
+    for (const b of blocksData) {
+      await API.patch(`/api/blocks/${b.id}/toggle`, { enabled: 0, cascade: true });
+    }
+    showToast('All blocks & rooms disabled','info'); loadAll();
+  } catch(e) { showToast(e.message,'error'); }
+}
+
+document.addEventListener('DOMContentLoaded', loadAll);
+</script>
+</body>
+</html>

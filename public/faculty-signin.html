@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Faculty Sign-In — Exam Day</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    /* Standalone page — no sidebar needed */
+    body { background: var(--off-white); }
+    .signin-page { min-height: 100vh; padding: 2rem; max-width: 900px; margin: 0 auto; }
+
+    .signin-header {
+      background: linear-gradient(135deg, var(--navy), var(--navy-light));
+      border-radius: var(--radius-lg);
+      padding: 2rem 2.5rem;
+      color: white;
+      display: flex; align-items: center; gap: 1.5rem;
+      margin-bottom: 2rem;
+      position: relative; overflow: hidden;
+    }
+    .signin-header::after {
+      content: '✅';
+      position: absolute; right: 1.5rem; top: 50%; transform: translateY(-50%);
+      font-size: 6rem; opacity: .07;
+    }
+    .signin-header .header-icon {
+      width: 60px; height: 60px;
+      background: var(--gold); border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.6rem; flex-shrink: 0;
+    }
+    .signin-header h1 { font-family:'Playfair Display',serif; font-size:1.5rem; }
+    .signin-header p  { color: rgba(255,255,255,.7); font-size:.9rem; margin-top:.2rem; }
+
+    .plan-select-card {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .plan-select-card label { font-size:.8rem; font-weight:600; color:var(--gray-700); text-transform:uppercase; letter-spacing:.05em; display:block; margin-bottom:.5rem; }
+
+    .faculty-signin-list { display: flex; flex-direction: column; gap: .75rem; }
+    .faculty-signin-row {
+      background: var(--white);
+      border: 2px solid var(--gray-200);
+      border-radius: var(--radius-lg);
+      padding: 1.1rem 1.5rem;
+      display: flex; align-items: center; gap: 1rem;
+      transition: var(--transition);
+      cursor: pointer;
+    }
+    .faculty-signin-row:hover { border-color: var(--navy); box-shadow: var(--shadow-sm); }
+    .faculty-signin-row.signed {
+      border-color: var(--green);
+      background: rgba(22,163,74,.04);
+    }
+    .check-circle {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      border: 2.5px solid var(--gray-300);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem;
+      transition: var(--transition);
+      flex-shrink: 0;
+      background: var(--white);
+    }
+    .faculty-signin-row.signed .check-circle {
+      background: var(--green);
+      border-color: var(--green);
+      color: white;
+    }
+    .faculty-signin-row:not(.signed) .check-circle {
+      color: transparent;
+    }
+    .fac-info h4 { font-size: .95rem; font-weight: 600; color: var(--gray-900); }
+    .fac-info p  { font-size: .8rem;  color: var(--gray-600); }
+    .room-pill {
+      margin-left: auto;
+      background: var(--navy);
+      color: var(--white);
+      border-radius: 8px;
+      padding: .4rem .9rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .85rem; font-weight: 600;
+      white-space: nowrap;
+    }
+    .time-stamp { font-size: .7rem; color: var(--green); margin-top: .15rem; font-style: italic; }
+
+    .summary-bar {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-lg);
+      padding: 1rem 1.5rem;
+      display: flex; align-items: center; gap: 2rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .summary-bar .s-item .lbl { font-size: .7rem; color: var(--gray-600); text-transform: uppercase; letter-spacing: .05em; }
+    .summary-bar .s-item .val { font-size: 1.4rem; font-weight: 700; font-family:'Playfair Display',serif; }
+    .summary-bar .s-item .val.green { color: var(--green); }
+    .summary-bar .s-item .val.amber { color: var(--amber); }
+
+    .signin-time-info {
+      font-size: .75rem;
+      color: var(--gray-500);
+      margin-top: .5rem;
+    }
+
+    @media print {
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+<div class="signin-page">
+
+  <!-- Header -->
+  <div class="signin-header">
+    <div class="header-icon">✅</div>
+    <div>
+      <h1>Faculty Sign-In</h1>
+      <p id="todayDate">Exam Day Attendance — Loading...</p>
+    </div>
+    <div style="margin-left:auto; text-align:right;" class="no-print">
+      <a href="/dashboard" class="btn btn-gold btn-sm">🏠 Dashboard</a>
+    </div>
+  </div>
+
+  <!-- Plan selector -->
+  <div class="plan-select-card no-print">
+    <label>Select Seating Plan</label>
+    <div style="display:flex; gap:1rem; align-items:center;">
+      <select id="planSelect" onchange="loadSigninData()" style="max-width:400px;">
+        <option value="">— Select exam plan —</option>
+      </select>
+      <div id="planInfo" class="text-sm text-gray"></div>
+    </div>
+  </div>
+
+  <!-- Summary bar -->
+  <div class="summary-bar" id="summaryBar" style="display:none;">
+    <div class="s-item">
+      <div class="lbl">Total Assigned</div>
+      <div class="val" id="sumTotal">0</div>
+    </div>
+    <div class="s-item">
+      <div class="lbl">Signed In</div>
+      <div class="val green" id="sumSigned">0</div>
+    </div>
+    <div class="s-item">
+      <div class="lbl">Pending</div>
+      <div class="val amber" id="sumPending">0</div>
+    </div>
+    <div style="margin-left:auto; no-print">
+      <button class="btn btn-outline btn-sm" onclick="loadSigninData()">🔄 Refresh</button>
+      <button class="btn btn-primary btn-sm no-print" onclick="window.print()">🖨️ Print</button>
+    </div>
+  </div>
+
+  <!-- Empty state -->
+  <div class="empty-state" id="emptyState" style="padding:4rem;">
+    <div class="icon">📋</div>
+    <h3>Select an Exam Plan</h3>
+    <p>Choose the current exam's seating plan to track faculty sign-in</p>
+  </div>
+
+  <!-- Sign-in list -->
+  <div class="faculty-signin-list" id="signinList"></div>
+
+  <div class="signin-time-info" id="lastRefresh"></div>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+let signinData   = [];
+let currentPlanId = null;
+const yearMap = {1:'1st',2:'2nd',3:'3rd',4:'4th'};
+
+document.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('todayDate').textContent =
+    'Exam Day — ' + new Date().toLocaleDateString('en-IN', {
+      weekday:'long', day:'2-digit', month:'long', year:'numeric'
+    });
+  await loadPlansDropdown();
+  // Check URL
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('plan')) {
+    document.getElementById('planSelect').value = params.get('plan');
+    loadSigninData();
+  }
+});
+
+async function loadPlansDropdown() {
+  try {
+    const plans = await API.get('/api/seating');
+    const sel = document.getElementById('planSelect');
+    sel.innerHTML = '<option value="">— Select exam plan —</option>' +
+      (plans||[]).map(p => {
+        const years = JSON.parse(p.years||'[]').map(y=>yearMap[y]+'Y').join(',');
+        return `<option value="${p.id}">${p.exam_type} Exam — ${formatDate(p.exam_date)} [${years}]</option>`;
+      }).join('');
+  } catch(e) {}
+}
+
+async function loadSigninData() {
+  const planId = document.getElementById('planSelect').value;
+  if (!planId) {
+    document.getElementById('summaryBar').style.display = 'none';
+    document.getElementById('emptyState').style.display = 'block';
+    document.getElementById('signinList').innerHTML = '';
+    return;
+  }
+  currentPlanId = planId;
+  document.getElementById('emptyState').style.display = 'none';
+
+  try {
+    signinData = await API.get(`/api/faculty/signin/${planId}`) || [];
+    renderSigninList();
+    updateSummary();
+    document.getElementById('summaryBar').style.display = 'flex';
+    document.getElementById('lastRefresh').textContent =
+      'Last updated: ' + new Date().toLocaleTimeString('en-IN');
+    // Update plan info
+    const plans = await API.get('/api/seating');
+    const plan = (plans||[]).find(p => p.id == planId);
+    if (plan) {
+      const years = JSON.parse(plan.years||'[]').map(y=>yearMap[y]+' Year').join(', ');
+      document.getElementById('planInfo').textContent =
+        `${plan.exam_type} · ${formatDate(plan.exam_date)} · ${years}`;
+    }
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+function renderSigninList() {
+  if (!signinData.length) {
+    document.getElementById('signinList').innerHTML = `
+      <div class="empty-state" style="padding:3rem;">
+        <div class="icon">👤</div>
+        <h3>No faculty assigned to this plan</h3>
+        <p><a href="/faculty-duty" style="color:var(--navy);">Go to Faculty Duty</a> to assign faculty</p>
+      </div>`;
+    return;
+  }
+
+  document.getElementById('signinList').innerHTML = signinData.map(f => `
+    <div class="faculty-signin-row ${f.signed_in ? 'signed' : ''}"
+         id="fac-row-${f.id}"
+         onclick="toggleSignIn(${f.id}, ${f.signed_in})">
+      <div class="check-circle" id="check-${f.id}">✓</div>
+      <div class="fac-info">
+        <h4>${f.name} <span style="font-size:.78rem; color:var(--gray-500);">(${f.emp_id})</span></h4>
+        <p>${f.department} &nbsp;·&nbsp; ${f.phone || 'No phone'}</p>
+        ${f.signed_in ? `<div class="time-stamp">✅ Signed in</div>` : ''}
+      </div>
+      <div class="room-pill">Room ${f.room_no}</div>
+    </div>
+  `).join('');
+}
+
+function updateSummary() {
+  const total  = signinData.length;
+  const signed = signinData.filter(f => f.signed_in).length;
+  document.getElementById('sumTotal').textContent   = total;
+  document.getElementById('sumSigned').textContent  = signed;
+  document.getElementById('sumPending').textContent = total - signed;
+}
+
+async function toggleSignIn(assignmentId, currentStatus) {
+  const newStatus = !currentStatus;
+  // Optimistic update
+  const row = document.getElementById(`fac-row-${assignmentId}`);
+  const f   = signinData.find(x => x.id === assignmentId);
+  if (!f || !row) return;
+
+  f.signed_in = newStatus ? 1 : 0;
+  row.classList.toggle('signed', !!f.signed_in);
+  updateSummary();
+
+  // Update timestamp display
+  row.querySelector('.fac-info p').nextElementSibling?.remove();
+  if (f.signed_in) {
+    const ts = document.createElement('div');
+    ts.className = 'time-stamp';
+    ts.textContent = '✅ Signed in at ' + new Date().toLocaleTimeString('en-IN');
+    row.querySelector('.fac-info').appendChild(ts);
+  }
+
+  try {
+    await API.patch(`/api/faculty/signin/${assignmentId}`, { signed_in: newStatus });
+    showToast(newStatus ? `${f.name} signed in ✅` : `${f.name} sign-in removed`, newStatus ? 'success' : 'info');
+  } catch(e) {
+    // Revert on error
+    f.signed_in = currentStatus ? 1 : 0;
+    row.classList.toggle('signed', !!f.signed_in);
+    updateSummary();
+    showToast(e.message, 'error');
+  }
+}
+
+// Auto-refresh every 60 seconds
+setInterval(() => {
+  if (currentPlanId) loadSigninData();
+}, 60000);
+</script>
+</body>
+</html>

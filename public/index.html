@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — Examination Seating System</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .login-form .error-msg {
+      background: rgba(220,38,38,.1); color: var(--red);
+      padding: .65rem 1rem; border-radius: var(--radius);
+      font-size: .85rem; margin-bottom: 1rem;
+      display: none; align-items: center; gap: .5rem;
+    }
+    .login-form .error-msg.show { display: flex; }
+    .login-creds {
+      margin-top: 1.5rem; padding: .85rem;
+      background: var(--gold-pale); border: 1px solid var(--gold);
+      border-radius: var(--radius); font-size: .8rem; color: var(--gray-700);
+    }
+    .login-creds strong { color: var(--navy); }
+  </style>
+</head>
+<body>
+<div class="login-page">
+  <!-- Left panel: Branding -->
+  <div class="login-left">
+    <div class="institute-seal">🎓</div>
+    <h1>Examination Branch<br>Seating System</h1>
+    <p class="tagline">Autonomous College Management</p>
+    <div class="features">
+      <div class="feature"><span class="icon">📋</span> Automated seating allocation</div>
+      <div class="feature"><span class="icon">🏛️</span> Block & room management</div>
+      <div class="feature"><span class="icon">👨‍🏫</span> Faculty duty assignment</div>
+      <div class="feature"><span class="icon">🖨️</span> Printable seating plans & duty slips</div>
+      <div class="feature"><span class="icon">📊</span> Mid & semester exam management</div>
+    </div>
+  </div>
+
+  <!-- Right panel: Login form -->
+  <div class="login-right">
+    <div class="login-card">
+      <h2>Admin Login</h2>
+      <p>Sign in to manage examination seating</p>
+
+      <form id="loginForm" class="login-form">
+        <div id="errorMsg" class="error-msg">
+          <span>⚠️</span> <span id="errorText">Invalid credentials</span>
+        </div>
+
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" placeholder="Enter username" autocomplete="username" required>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="Enter password" autocomplete="current-password" required>
+        </div>
+
+        <button type="submit" id="loginBtn" class="btn btn-primary btn-lg" style="width:100%">
+          🔐 Sign In
+        </button>
+      </form>
+
+      <div class="login-creds">
+        <strong>Default Credentials:</strong><br>
+        Username: <strong>admin</strong> &nbsp;|&nbsp; Password: <strong>admin123</strong>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Redirect if already logged in
+  fetch('/api/auth/me', { credentials: 'include' })
+    .then(r => { if (r.ok) window.location.href = '/dashboard'; });
+
+  document.getElementById('loginForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn  = document.getElementById('loginBtn');
+    const errEl = document.getElementById('errorMsg');
+    const errTxt = document.getElementById('errorText');
+    errEl.classList.remove('show');
+
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;border-color:rgba(255,255,255,.3);border-top-color:#fff"></div> Signing in...';
+
+    try {
+      const resp = await fetch('/api/auth/login', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: document.getElementById('username').value,
+          password: document.getElementById('password').value
+        })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'Login failed');
+      window.location.href = '/dashboard';
+    } catch(err) {
+      errTxt.textContent = err.message;
+      errEl.classList.add('show');
+      btn.disabled = false;
+      btn.innerHTML = '🔐 Sign In';
+    }
+  });
+</script>
+</body>
+</html>

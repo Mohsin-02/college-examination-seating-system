@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generate Seating Plan — Seating System</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .gen-wrap { max-width: 720px; margin: 0 auto; }
+
+    /* Step cards */
+    .step-card {
+      background: var(--white); border: 1px solid var(--gray-200);
+      border-radius: var(--radius-lg); margin-bottom: 1.25rem; overflow: hidden;
+    }
+    .step-header {
+      background: var(--navy); color: white;
+      padding: .85rem 1.5rem;
+      display: flex; align-items: center; gap: .75rem;
+    }
+    .step-num {
+      width: 28px; height: 28px; background: var(--gold);
+      color: var(--navy); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: .85rem; flex-shrink: 0;
+    }
+    .step-header h3 { font-size: .95rem; font-weight: 600; }
+    .step-body { padding: 1.25rem 1.5rem; }
+
+    /* Exam type selector */
+    .exam-type-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: .75rem; }
+    .exam-type-btn {
+      border: 2px solid var(--gray-200); border-radius: var(--radius);
+      padding: 1rem; text-align: center; cursor: pointer;
+      background: var(--white); transition: var(--transition);
+    }
+    .exam-type-btn:hover { border-color: var(--navy); }
+    .exam-type-btn.active { border-color: var(--gold); background: var(--gold-pale); }
+    .exam-type-btn .icon { font-size: 1.8rem; display: block; margin-bottom: .3rem; }
+    .exam-type-btn h4 { font-size: .85rem; color: var(--navy); font-weight: 600; }
+    .exam-type-btn p { font-size: .72rem; color: var(--gray-600); margin-top: .15rem; }
+
+    /* Year selector */
+    .year-chips { display: flex; gap: .75rem; flex-wrap: wrap; }
+    .year-chip {
+      border: 2px solid var(--gray-200); border-radius: 8px;
+      padding: .5rem 1.25rem; cursor: pointer;
+      font-weight: 600; font-size: .875rem;
+      background: var(--white); transition: var(--transition);
+      user-select: none;
+    }
+    .year-chip[data-year="1"].active { border-color:#1e40af; background:#dbeafe; color:#1e40af; }
+    .year-chip[data-year="2"].active { border-color:#166534; background:#dcfce7; color:#166534; }
+    .year-chip[data-year="3"].active { border-color:#854d0e; background:#fef9c3; color:#854d0e; }
+    .year-chip[data-year="4"].active { border-color:#9d174d; background:#fce7f3; color:#9d174d; }
+    .year-chip:hover { border-color: var(--navy); }
+
+    /* Faculty count selector */
+    .fac-count-row { display: flex; gap: .75rem; }
+    .fac-btn {
+      flex: 1; border: 2px solid var(--gray-200); border-radius: var(--radius);
+      padding: .6rem; text-align: center; cursor: pointer;
+      background: var(--white); transition: var(--transition); font-weight: 600;
+    }
+    .fac-btn.active { border-color: var(--navy); background: var(--navy); color: white; }
+
+    /* Preview box */
+    .preview-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: .5rem; font-size: .85rem;
+    }
+    .preview-row { display: flex; justify-content: space-between; padding: .35rem 0;
+      border-bottom: 1px dashed var(--gray-100); }
+    .preview-row:last-child { border-bottom: none; }
+    .preview-label { color: var(--gray-600); }
+    .preview-value { font-weight: 600; }
+
+    /* Result */
+    .result-banner {
+      background: linear-gradient(135deg, #16a34a, #15803d);
+      border-radius: var(--radius-lg); padding: 2rem; text-align: center;
+      color: white; display: none; margin-top: 1.25rem;
+    }
+    .result-banner.show { display: block; }
+    .result-banner h3 { font-family:'Playfair Display',serif; font-size: 1.4rem; margin-bottom: .4rem; }
+    .result-stats { display: flex; justify-content: center; gap: 2.5rem; margin: 1.25rem 0; }
+    .r-stat .val { font-size: 2rem; font-weight: 700; font-family:'Playfair Display',serif; }
+    .r-stat .lbl { font-size: .72rem; opacity: .8; text-transform: uppercase; letter-spacing: .05em; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div class="main-content">
+    <div class="top-bar">
+      <h1 class="page-title">⚙️ Generate Seating Plan</h1>
+      <div class="top-bar-actions">
+        <a href="/seating-viewer" class="btn btn-outline btn-sm">📋 View Plans</a>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="gen-wrap">
+
+        <!-- STEP 1: Exam Type -->
+        <div class="step-card">
+          <div class="step-header">
+            <div class="step-num">1</div>
+            <h3>Select Exam Type</h3>
+          </div>
+          <div class="step-body">
+            <div class="exam-type-grid">
+              <div class="exam-type-btn" data-type="Mid" data-mid="Mid-1" onclick="selectExamType(this)">
+                <span class="icon">📝</span>
+                <h4>Mid-1</h4><p>First internal exam</p>
+              </div>
+              <div class="exam-type-btn" data-type="Mid" data-mid="Mid-2" onclick="selectExamType(this)">
+                <span class="icon">📋</span>
+                <h4>Mid-2</h4><p>Second internal exam</p>
+              </div>
+              <div class="exam-type-btn" data-type="Mid" data-mid="Mid-3" onclick="selectExamType(this)">
+                <span class="icon">📓</span>
+                <h4>Mid-3</h4><p>Third internal exam</p>
+              </div>
+              <div class="exam-type-btn" data-type="Semester" data-mid="Semester" onclick="selectExamType(this)">
+                <span class="icon">📚</span>
+                <h4>Semester</h4><p>End semester exam</p>
+              </div>
+              <div class="exam-type-btn" data-type="Mid" data-mid="Supplementary" onclick="selectExamType(this)">
+                <span class="icon">📄</span>
+                <h4>Supplementary</h4><p>Supply exam</p>
+              </div>
+              <div class="exam-type-btn" data-type="Mid" data-mid="Custom" onclick="selectExamType(this)">
+                <span class="icon">✏️</span>
+                <h4>Custom</h4><p>Other / rename below</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 2: Exam Details -->
+        <div class="step-card">
+          <div class="step-header">
+            <div class="step-num">2</div>
+            <h3>Exam Details</h3>
+          </div>
+          <div class="step-body">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Exam Date *</label>
+                <input type="date" id="examDate">
+              </div>
+              <div class="form-group">
+                <label>Session</label>
+                <select id="session">
+                  <option value="AN">AN — Afternoon (FN)</option>
+                  <option value="FN">FN — Forenoon (AN)</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Exam Full Name (editable)</label>
+              <input type="text" id="examName" placeholder="e.g. IV B.Tech II Sem Mid-I Examination February 2026">
+              <div class="text-xs text-gray mt-1">Leave blank to auto-generate from selections above</div>
+            </div>
+            <div class="form-group">
+              <label>Regulation / Batch (optional)</label>
+              <input type="text" id="regulation" placeholder="e.g. R22, R19">
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 3: Select Years -->
+        <div class="step-card">
+          <div class="step-header">
+            <div class="step-num">3</div>
+            <h3>Select Year(s)</h3>
+          </div>
+          <div class="step-body">
+            <div class="year-chips">
+              <div class="year-chip" data-year="1" onclick="toggleYear(this)">🔵 I Year</div>
+              <div class="year-chip" data-year="2" onclick="toggleYear(this)">🟢 II Year</div>
+              <div class="year-chip" data-year="3" onclick="toggleYear(this)">🟡 III Year</div>
+              <div class="year-chip" data-year="4" onclick="toggleYear(this)">🔴 IV Year</div>
+              <button class="btn btn-outline btn-sm" onclick="selectAllYears()" style="height:auto;">All</button>
+              <button class="btn btn-outline btn-sm" onclick="clearAllYears()" style="height:auto;">Clear</button>
+            </div>
+            <div id="yearCountInfo" style="margin-top:.85rem; font-size:.83rem; color:var(--gray-600);"></div>
+          </div>
+        </div>
+
+        <!-- STEP 4: Bench & Faculty Config -->
+        <div class="step-card">
+          <div class="step-header">
+            <div class="step-num">4</div>
+            <h3>Seating Configuration</h3>
+          </div>
+          <div class="step-body">
+            <div class="form-group">
+              <label>Faculty per Room (default 2)</label>
+              <div class="fac-count-row">
+                <div class="fac-btn" data-count="1" onclick="selectFacCount(this)">1 Faculty</div>
+                <div class="fac-btn active" data-count="2" onclick="selectFacCount(this)">2 Faculty</div>
+                <div class="fac-btn" data-count="3" onclick="selectFacCount(this)">3 Faculty</div>
+              </div>
+              <div class="text-xs text-gray mt-1">Can be changed per room after generation</div>
+            </div>
+            <div class="form-group">
+              <label>Bench Mode</label>
+              <div style="background:var(--gray-50); border:1px solid var(--gray-200);
+                          border-radius:var(--radius); padding:.85rem; font-size:.85rem;">
+                <div id="benchModeInfo">
+                  Select exam type above to see bench mode details.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 5: Preview -->
+        <div class="step-card" id="previewCard">
+          <div class="step-header">
+            <div class="step-num">5</div>
+            <h3>Plan Preview</h3>
+          </div>
+          <div class="step-body">
+            <div id="previewContent" style="color:var(--gray-500); font-size:.875rem;">
+              Complete all steps above to see preview
+            </div>
+          </div>
+        </div>
+
+        <!-- Generate Button -->
+        <div style="text-align:center; margin-bottom: 1rem;">
+          <button class="btn btn-gold btn-lg" id="generateBtn" onclick="generatePlan()"
+            style="min-width:220px; font-size:1rem;">
+            ⚙️ Generate Seating Plan
+          </button>
+        </div>
+
+        <!-- Result -->
+        <div class="result-banner" id="resultBanner">
+          <div style="font-size:2.5rem;">✅</div>
+          <h3>Seating Plan Generated!</h3>
+          <p id="resultMsg" style="opacity:.85;"></p>
+          <div class="result-stats" id="resultStats"></div>
+          <div style="display:flex; gap:1rem; justify-content:center; flex-wrap:wrap;">
+            <a id="viewBtn"  href="#" class="btn btn-gold btn-lg">📋 View Plan</a>
+            <a id="printBtn" href="#" class="btn btn-lg" style="background:rgba(255,255,255,.2);color:white;">🖨️ Print</a>
+          </div>
+        </div>
+
+      </div><!-- /gen-wrap -->
+    </div><!-- /content -->
+  </div>
+</div>
+
+<script src="/js/sidebar.js"></script>
+<script src="/js/common.js"></script>
+<script>
+let selectedExamType = '';
+let selectedMidType  = '';
+let selectedYears    = new Set();
+let selectedFacCount = 2;
+let studentStats     = [];
+
+document.addEventListener('DOMContentLoaded', async () => {
+  studentStats = await API.get('/api/students/stats') || [];
+  document.getElementById('examDate').value = new Date().toISOString().split('T')[0];
+  checkAuth();
+});
+
+function selectExamType(el) {
+  document.querySelectorAll('.exam-type-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  selectedExamType = el.dataset.type;
+  selectedMidType  = el.dataset.mid;
+
+  // Update bench mode info
+  const isSem = selectedExamType === 'Semester';
+  document.getElementById('benchModeInfo').innerHTML = isSem
+    ? `<strong>Semester Mode:</strong> 1 student per bench — each bench position (row × column) holds a single student.<br>
+       Columns maintain same year+branch group vertically (front → back in roll number order).`
+    : `<strong>Mid Exam Mode:</strong> 2 students per bench (Left + Right seats).<br>
+       Left seat and Right seat at same bench come from <strong>different year groups</strong>.<br>
+       Each sub-column (L lane or R lane) maintains same year+branch group front → back.`;
+
+  // Auto-fill exam name
+  autoFillExamName();
+  updatePreview();
+}
+
+function toggleYear(el) {
+  const y = Number(el.dataset.year);
+  el.classList.toggle('active');
+  if (el.classList.contains('active')) selectedYears.add(y);
+  else selectedYears.delete(y);
+  updateYearCount();
+  autoFillExamName();
+  updatePreview();
+}
+
+function selectAllYears() {
+  [1,2,3,4].forEach(y => {
+    document.querySelector(`.year-chip[data-year="${y}"]`).classList.add('active');
+    selectedYears.add(y);
+  });
+  updateYearCount(); autoFillExamName(); updatePreview();
+}
+
+function clearAllYears() {
+  document.querySelectorAll('.year-chip').forEach(c => c.classList.remove('active'));
+  selectedYears.clear();
+  updateYearCount(); updatePreview();
+}
+
+function selectFacCount(el) {
+  document.querySelectorAll('.fac-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  selectedFacCount = Number(el.dataset.count);
+  updatePreview();
+}
+
+function updateYearCount() {
+  if (!selectedYears.size) {
+    document.getElementById('yearCountInfo').textContent = '';
+    return;
+  }
+  const total = studentStats
+    .filter(s => selectedYears.has(s.year))
+    .reduce((sum,s) => sum + s.count, 0);
+  const yearLabels = {1:'I Year',2:'II Year',3:'III Year',4:'IV Year'};
+  const years = [...selectedYears].sort().map(y => yearLabels[y]).join(', ');
+  document.getElementById('yearCountInfo').innerHTML =
+    `📊 <strong>${total} students</strong> selected — ${years}`;
+}
+
+function autoFillExamName() {
+  if (document.getElementById('examName').value &&
+      !document.getElementById('examName').dataset.autofilled) return;
+  if (!selectedMidType || !selectedYears.size) return;
+  const yearOrdinals = {1:'I',2:'II',3:'III',4:'IV'};
+  const years = [...selectedYears].sort().map(y => `${yearOrdinals[y]} B.Tech`).join(', ');
+  const date  = document.getElementById('examDate').value;
+  const d     = date ? new Date(date) : new Date();
+  const month = d.toLocaleString('en-IN', {month:'long'});
+  const year  = d.getFullYear();
+  const sem   = selectedYears.size === 1 && [...selectedYears][0] <= 2 ? 'I Semester' : 'II Semester';
+  const name  = `${years} ${sem} ${selectedMidType} Examination ${month} - ${year}`;
+  document.getElementById('examName').value = name;
+  document.getElementById('examName').dataset.autofilled = '1';
+}
+
+function updatePreview() {
+  const date = document.getElementById('examDate').value;
+  if (!selectedExamType || !selectedYears.size || !date) {
+    document.getElementById('previewContent').innerHTML =
+      '<span style="color:var(--gray-400);">Complete all steps to see preview</span>';
+    return;
+  }
+  const total = studentStats.filter(s => selectedYears.has(s.year)).reduce((s,r)=>s+r.count,0);
+  const yearLabels = {1:'I Year',2:'II Year',3:'III Year',4:'IV Year'};
+  const isSem = selectedExamType === 'Semester';
+  const studPerBench = isSem ? 1 : 2;
+  document.getElementById('previewContent').innerHTML = `
+    <div class="preview-grid">
+      <div class="preview-row"><span class="preview-label">Exam Type</span><span class="preview-value">${selectedMidType}</span></div>
+      <div class="preview-row"><span class="preview-label">Date</span><span class="preview-value">${formatDate(date)}</span></div>
+      <div class="preview-row"><span class="preview-label">Years</span><span class="preview-value">${[...selectedYears].sort().map(y=>yearLabels[y]).join(', ')}</span></div>
+      <div class="preview-row"><span class="preview-label">Total Students</span><span class="preview-value">${total}</span></div>
+      <div class="preview-row"><span class="preview-label">Bench Mode</span><span class="preview-value">${studPerBench} student/bench</span></div>
+      <div class="preview-row"><span class="preview-label">Faculty/Room</span><span class="preview-value">${selectedFacCount}</span></div>
+    </div>`;
+}
+
+async function generatePlan() {
+  if (!selectedExamType)   return showToast('Select an exam type first', 'error');
+  if (!selectedYears.size) return showToast('Select at least one year', 'error');
+  const examDate = document.getElementById('examDate').value;
+  if (!examDate) return showToast('Select exam date', 'error');
+
+  const examName = document.getElementById('examName').value.trim();
+  const reg = document.getElementById('regulation').value.trim();
+  const session = document.getElementById('session').value;
+  const fullName = examName
+    + (reg ? ` ( ${reg} Regulation )` : '')
+    + ` ( ${session} )`;
+
+  setLoading('generateBtn', true);
+  document.getElementById('resultBanner').classList.remove('show');
+
+  try {
+    const result = await API.post('/api/seating/generate', {
+      exam_type:       selectedExamType,
+      exam_name:       fullName,
+      mid_type:        selectedMidType,
+      exam_date:       examDate,
+      years:           [...selectedYears].sort(),
+      faculty_per_room: selectedFacCount
+    });
+
+    const summary = await API.get(`/api/seating/${result.plan_id}/summary`);
+    document.getElementById('resultBanner').classList.add('show');
+    document.getElementById('resultMsg').textContent = result.message;
+    document.getElementById('resultStats').innerHTML = `
+      <div class="r-stat"><div class="val">${summary.total_students}</div><div class="lbl">Students</div></div>
+      <div class="r-stat"><div class="val">${summary.rooms_used}</div><div class="lbl">Rooms</div></div>
+      <div class="r-stat"><div class="val">${summary.faculty_assigned}</div><div class="lbl">Faculty</div></div>
+    `;
+    document.getElementById('viewBtn').href  = `/seating-viewer?plan=${result.plan_id}`;
+    document.getElementById('printBtn').href = `/seating-viewer?plan=${result.plan_id}&print=summary`;
+    document.getElementById('resultBanner').scrollIntoView({ behavior:'smooth' });
+    showToast('Plan generated successfully!', 'success');
+  } catch(e) {
+    showToast(e.message, 'error');
+  } finally {
+    setLoading('generateBtn', false);
+  }
+}
+
+// Auto-update exam name when date changes
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('examDate').addEventListener('change', () => {
+    document.getElementById('examName').dataset.autofilled = '';
+    autoFillExamName();
+    updatePreview();
+  });
+});
+</script>
+</body>
+</html>

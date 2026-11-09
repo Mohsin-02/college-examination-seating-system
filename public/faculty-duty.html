@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Faculty Duty — Seating System</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .duty-layout { display: grid; grid-template-columns: 360px 1fr; gap: 1.5rem; align-items: start; }
+    .assign-panel { position: sticky; top: 80px; }
+    .room-assign-row {
+      background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius);
+      padding: .75rem .9rem; margin-bottom: .5rem;
+    }
+    .room-assign-row .rr-header {
+      display:flex; align-items:center; gap:.5rem;
+      font-weight:700; color:var(--navy); font-size:.88rem; margin-bottom:.5rem;
+    }
+    .room-assign-row .rr-header .rr-sub { font-weight:400; color:var(--gray-600); font-size:.75rem; }
+    .fac-slot { display:flex; align-items:center; gap:.5rem; margin-bottom:.35rem; }
+    .fac-slot label { font-size:.72rem; color:var(--gray-600); min-width:55px; }
+    .fac-slot select { flex:1; font-size:.8rem; padding:.35rem .6rem; }
+    .slot-remove { background:none; border:none; cursor:pointer; color:var(--red); font-size:1rem; padding:.2rem; }
+    .btn-add-slot { background:none; border:1px dashed var(--gray-300); color:var(--gray-600);
+      font-size:.75rem; padding:.25rem .6rem; border-radius:4px; cursor:pointer; width:100%; margin-top:.25rem; }
+    .btn-add-slot:hover { border-color:var(--navy); color:var(--navy); }
+
+    /* Slips grid */
+    .slips-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); gap: 1.25rem; }
+
+    @media print {
+      .no-print, .sidebar, .top-bar { display: none !important; }
+      .main-content { margin-left: 0 !important; }
+      .content { padding: 0 !important; }
+      .duty-layout { grid-template-columns: 1fr !important; }
+      .assign-panel { display: none !important; }
+      .slips-grid { grid-template-columns: repeat(2,1fr) !important; gap: .75rem; }
+      body { background: white !important; }
+      .duty-slip { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div class="main-content">
+    <div class="top-bar no-print">
+      <h1 class="page-title">📝 Faculty Duty Assignment</h1>
+      <div class="top-bar-actions">
+        <button class="btn btn-gold" onclick="window.print()">🖨️ Print All Slips</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- Plan selector -->
+      <div class="card no-print" style="margin-bottom:1.5rem;">
+        <div class="card-header"><span>📋</span><h3>Select Seating Plan</h3></div>
+        <div class="card-body">
+          <div style="display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
+            <select id="planSelect" onchange="loadPlanDuty()" style="max-width:400px; flex:1;">
+              <option value="">— Choose a seating plan —</option>
+            </select>
+            <div id="planMeta" class="text-sm text-gray"></div>
+            <div id="facCountControl" style="display:none; display:flex; align-items:center; gap:.5rem;">
+              <label style="font-size:.8rem; font-weight:600; white-space:nowrap;">Faculty/Room:</label>
+              <select id="globalFacCount" onchange="changeGlobalFacCount()"
+                style="max-width:110px; padding:.4rem .6rem;">
+                <option value="1">1 per room</option>
+                <option value="2" selected>2 per room</option>
+                <option value="3">3 per room</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty state -->
+      <div class="empty-state" id="emptyState" style="padding:4rem;">
+        <div class="icon">📝</div>
+        <h3>Select a Seating Plan</h3>
+        <p>Choose a plan above to manage faculty duty assignments</p>
+      </div>
+
+      <!-- Main duty layout -->
+      <div id="mainContent" style="display:none;">
+        <div class="duty-layout">
+          <!-- Left: Assign panel -->
+          <div class="assign-panel no-print">
+            <div class="card">
+              <div class="card-header">
+                <span>🔄</span><h3>Assign Faculty to Rooms</h3>
+                <div class="actions">
+                  <button class="btn btn-primary btn-sm" id="saveBtn" onclick="saveAssignments()">💾 Save All</button>
+                </div>
+              </div>
+              <div class="card-body" style="padding:.75rem; max-height:65vh; overflow-y:auto;">
+                <div id="assignPanel"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Duty slips -->
+          <div>
+            <div style="margin-bottom:.75rem; display:flex; align-items:center; gap:1rem;" class="no-print">
+              <h3 style="color:var(--gray-700);">📄 Duty Slips Preview</h3>
+              <span id="slipsCount" class="badge badge-navy" style="margin-left:auto;"></span>
+            </div>
+            <!-- Print-only header -->
+            <div id="printOnlyHeader" style="display:none; text-align:center; margin-bottom:1.5rem;">
+              <h2 style="font-family:'Playfair Display',serif; color:var(--navy);">Faculty Duty Slips</h2>
+              <p id="printPlanInfo" style="color:#666; font-size:.85rem;"></p>
+            </div>
+            <div class="slips-grid" id="slipsGrid">
+              <div class="loading"><div class="spinner"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/sidebar.js"></script>
+<script src="/js/common.js"></script>
+<script>
+let currentPlan = null;
+let planRooms   = [];
+let allFaculty  = [];
+// assignments: { roomId → [facultyId, facultyId?, ...] }
+let assignments = {};
+const yearMap   = {1:'I',2:'II',3:'III',4:'IV'};
+
+document.addEventListener('DOMContentLoaded', async () => {
+  await checkAuth();
+  await Promise.all([loadPlansDropdown(), loadFaculty()]);
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('plan')) {
+    document.getElementById('planSelect').value = params.get('plan');
+    loadPlanDuty();
+  }
+});
+
+async function loadPlansDropdown() {
+  const plans = await API.get('/api/seating') || [];
+  const sel = document.getElementById('planSelect');
+  sel.innerHTML = '<option value="">— Choose a seating plan —</option>' +
+    plans.map(p => {
+      const years = JSON.parse(p.years||'[]').map(y=>yearMap[y]+'Y').join(',');
+      return `<option value="${p.id}">${p.exam_name||p.mid_type||p.exam_type} — ${formatDate(p.exam_date)} [${years}]</option>`;
+    }).join('');
+}
+
+async function loadFaculty() {
+  allFaculty = await API.get('/api/faculty?available=1') || [];
+}
+
+async function loadPlanDuty() {
+  const planId = document.getElementById('planSelect').value;
+  if (!planId) {
+    document.getElementById('emptyState').style.display = 'block';
+    document.getElementById('mainContent').style.display = 'none';
+    document.getElementById('facCountControl').style.display = 'none';
+    return;
+  }
+  document.getElementById('emptyState').style.display  = 'none';
+  document.getElementById('mainContent').style.display = 'block';
+  document.getElementById('facCountControl').style.display = 'flex';
+
+  try {
+    const data = await API.get(`/api/seating/${planId}`);
+    currentPlan = data.plan;
+    planRooms   = data.rooms;
+
+    // Current assignments from loaded data
+    assignments = {};
+    planRooms.forEach(r => {
+      assignments[r.id] = (r.faculty || []).map(f => f.id);
+    });
+
+    // Update global faculty count selector
+    document.getElementById('globalFacCount').value = currentPlan.faculty_per_room || 2;
+
+    // Plan meta
+    const years = JSON.parse(currentPlan.years||'[]').map(y=>yearMap[y]+' Year').join(', ');
+    document.getElementById('planMeta').textContent =
+      `${currentPlan.exam_name||currentPlan.mid_type} · ${formatDate(currentPlan.exam_date)} · ${years}`;
+    document.getElementById('printPlanInfo').textContent =
+      `${currentPlan.exam_name||currentPlan.mid_type} · ${formatDate(currentPlan.exam_date)}`;
+
+    renderAssignPanel();
+    renderDutySlips();
+  } catch(e) { showToast(e.message,'error'); }
+}
+
+// ── Change global faculty count ──────────────────────────────
+async function changeGlobalFacCount() {
+  const newCount = Number(document.getElementById('globalFacCount').value);
+  if (!currentPlan) return;
+  try {
+    await API.patch(`/api/seating/${currentPlan.id}/meta`, { faculty_per_room: newCount });
+    showToast(`Faculty count updated to ${newCount} per room`, 'success');
+    // Reload to reset assignments
+    loadPlanDuty();
+  } catch(e) { showToast(e.message,'error'); }
+}
+
+// ── Render assign panel ───────────────────────────────────────
+function renderAssignPanel() {
+  const facPerRoom = Number(document.getElementById('globalFacCount').value) || 2;
+  document.getElementById('assignPanel').innerHTML = planRooms.map(room => {
+    const slots = assignments[room.id] || [];
+    // Build slot rows
+    const slotRows = Array.from({length: Math.max(facPerRoom, slots.length)}, (_, i) => {
+      const selVal = slots[i] || '';
+      return `
+        <div class="fac-slot" id="slot-${room.id}-${i}">
+          <label>Slot ${i+1}</label>
+          <select onchange="updateSlot(${room.id}, ${i}, this.value)">
+            <option value="">— Unassigned —</option>
+            ${allFaculty.map(f => `
+              <option value="${f.id}" ${f.id == selVal ? 'selected' : ''}>
+                ${f.name} (${f.department})
+              </option>
+            `).join('')}
+          </select>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="room-assign-row">
+        <div class="rr-header">
+          🚪 ${room.room_no}
+          <span class="rr-sub">Block ${room.block_name} · ${room.students_assigned} students</span>
+        </div>
+        <div id="slots-${room.id}">${slotRows}</div>
+      </div>`;
+  }).join('');
+}
+
+function updateSlot(roomId, slotIdx, facId) {
+  if (!assignments[roomId]) assignments[roomId] = [];
+  while (assignments[roomId].length <= slotIdx) assignments[roomId].push(null);
+  assignments[roomId][slotIdx] = facId ? Number(facId) : null;
+}
+
+async function saveAssignments() {
+  const planId = document.getElementById('planSelect').value;
+  if (!planId) return;
+  const assignArr = [];
+  Object.entries(assignments).forEach(([roomId, facIds]) => {
+    (facIds||[]).forEach(fid => {
+      if (fid) assignArr.push({ room_id: Number(roomId), faculty_id: Number(fid) });
+    });
+  });
+  setLoading('saveBtn', true);
+  try {
+    await API.put(`/api/seating/${planId}/faculty`, {
+      assignments: assignArr,
+      faculty_per_room: Number(document.getElementById('globalFacCount').value)
+    });
+    showToast('Faculty assignments saved','success');
+    loadPlanDuty();
+  } catch(e) { showToast(e.message,'error'); }
+  finally { setLoading('saveBtn', false); }
+}
+
+// ── Render duty slips ─────────────────────────────────────────
+function renderDutySlips() {
+  const planId = document.getElementById('planSelect').value;
+  const roomsWithFac = planRooms.filter(r => r.faculty && r.faculty.length);
+  document.getElementById('slipsCount').textContent = `${roomsWithFac.length} slips`;
+  document.getElementById('printOnlyHeader').style.display = roomsWithFac.length ? '' : 'none';
+
+  if (!roomsWithFac.length) {
+    document.getElementById('slipsGrid').innerHTML = `
+      <div class="empty-state" style="grid-column:1/-1; padding:2rem;">
+        <div class="icon">👤</div><h3>No faculty assigned yet</h3>
+        <p>Assign faculty in the left panel and click Save</p>
+      </div>`;
+    return;
+  }
+
+  const years = JSON.parse(currentPlan.years||'[]').map(y=>yearMap[y]+' Year').join(', ');
+
+  document.getElementById('slipsGrid').innerHTML = roomsWithFac.flatMap(room =>
+    room.faculty.map((fac, fi) => `
+      <div class="duty-slip">
+        <div class="duty-slip-header">
+          <div style="font-size:1.4rem;">🎓</div>
+          <h2>Faculty Duty Slip</h2>
+          <p style="font-size:.72rem; color:#999;">${currentPlan.exam_name||currentPlan.mid_type} Examination</p>
+        </div>
+
+        <div class="duty-detail"><span class="label">👤 Faculty Name</span>
+          <span class="value">${fac.name}</span></div>
+        <div class="duty-detail"><span class="label">🪪 Employee ID</span>
+          <span class="value">${fac.emp_id}</span></div>
+        <div class="duty-detail"><span class="label">🏫 Department</span>
+          <span class="value">${fac.department}</span></div>
+        <div class="duty-detail"><span class="label">📞 Phone</span>
+          <span class="value">${fac.phone||'—'}</span></div>
+        <div class="duty-detail"><span class="label">🚪 Room Assigned</span>
+          <span class="value" style="font-weight:700;color:var(--navy);">
+            ${room.room_no} (Block ${room.block_name})</span></div>
+        <div class="duty-detail"><span class="label">📅 Exam Date</span>
+          <span class="value">${formatDate(currentPlan.exam_date)}</span></div>
+        <div class="duty-detail"><span class="label">📚 Exam Type</span>
+          <span class="value">${currentPlan.exam_name||currentPlan.mid_type}</span></div>
+        <div class="duty-detail"><span class="label">🎓 Years</span>
+          <span class="value">${years}</span></div>
+        <div class="duty-detail"><span class="label">👨‍🎓 Students</span>
+          <span class="value">${room.students_assigned}</span></div>
+        <div class="duty-detail"><span class="label">👥 Slot</span>
+          <span class="value">Invigilator ${fi+1} of ${room.faculty.length}</span></div>
+
+        <div class="sign-area">
+          <div class="sign-box"><div class="sign-line"></div><p>Faculty Signature</p></div>
+          <div class="sign-box"><div class="sign-line"></div><p>Arrival Time</p></div>
+          <div class="sign-box"><div class="sign-line"></div><p>Chief Superintendent</p></div>
+        </div>
+      </div>`)
+  ).join('');
+}
+</script>
+
+<style>
+  @media screen { #printOnlyHeader { display: none !important; } }
+  @media print  { #printOnlyHeader { display: block !important; } .no-print { display:none !important; } }
+</style>
+</body>
+</html>

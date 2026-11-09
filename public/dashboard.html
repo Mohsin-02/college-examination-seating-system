@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Seating System</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app-layout">
+  <!-- Sidebar injected by sidebar.js -->
+
+  <div class="main-content">
+    <div class="top-bar">
+      <h1 class="page-title">📊 Dashboard</h1>
+      <div class="top-bar-actions">
+        <span id="today-date" class="text-sm text-gray"></span>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- Welcome banner -->
+      <div style="background:linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
+                  border-radius:var(--radius-lg); padding:2rem; margin-bottom:2rem;
+                  color:white; position:relative; overflow:hidden;">
+        <div style="position:absolute;right:-20px;top:-20px;font-size:8rem;opacity:.07;">🎓</div>
+        <h2 style="font-family:'Playfair Display',serif; font-size:1.6rem; margin-bottom:.4rem;">
+          Welcome, <span id="welcome-name">Admin</span>
+        </h2>
+        <p style="color:rgba(255,255,255,.7); font-size:.9rem;">
+          Examination Branch — Seating Arrangement System
+        </p>
+      </div>
+
+      <!-- Stats grid -->
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card">
+          <div class="stat-icon navy">👨‍🎓</div>
+          <div class="stat-info">
+            <div class="label">Total Students</div>
+            <div class="value" id="stat-students">—</div>
+            <div class="sub">Across all years</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon gold">👨‍🏫</div>
+          <div class="stat-info">
+            <div class="label">Faculty</div>
+            <div class="value" id="stat-faculty">—</div>
+            <div class="sub" id="stat-faculty-avail">Loading...</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green">🏛️</div>
+          <div class="stat-info">
+            <div class="label">Total Rooms</div>
+            <div class="value" id="stat-rooms">—</div>
+            <div class="sub" id="stat-capacity">Loading...</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon blue">📋</div>
+          <div class="stat-info">
+            <div class="label">Seating Plans</div>
+            <div class="value" id="stat-plans">—</div>
+            <div class="sub">Generated plans</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Year-wise student distribution -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:2rem;">
+
+        <!-- Year breakdown -->
+        <div class="card">
+          <div class="card-header">
+            <span>📊</span>
+            <h3>Students by Year</h3>
+          </div>
+          <div class="card-body" id="yearBreakdown">
+            <div class="loading"><div class="spinner"></div> Loading...</div>
+          </div>
+        </div>
+
+        <!-- Quick actions -->
+        <div class="card">
+          <div class="card-header">
+            <span>⚡</span>
+            <h3>Quick Actions</h3>
+          </div>
+          <div class="card-body">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:.75rem;">
+              <a href="/students" class="btn btn-outline" style="justify-content:center; padding:1rem; flex-direction:column; height:auto; gap:.25rem;">
+                <span style="font-size:1.5rem;">👨‍🎓</span>
+                <span>Manage Students</span>
+              </a>
+              <a href="/faculty" class="btn btn-outline" style="justify-content:center; padding:1rem; flex-direction:column; height:auto; gap:.25rem;">
+                <span style="font-size:1.5rem;">👨‍🏫</span>
+                <span>Manage Faculty</span>
+              </a>
+              <a href="/seating-generator" class="btn btn-gold" style="justify-content:center; padding:1rem; flex-direction:column; height:auto; gap:.25rem;">
+                <span style="font-size:1.5rem;">⚙️</span>
+                <span>Generate Plan</span>
+              </a>
+              <a href="/seating-viewer" class="btn btn-primary" style="justify-content:center; padding:1rem; flex-direction:column; height:auto; gap:.25rem;">
+                <span style="font-size:1.5rem;">📋</span>
+                <span>View Plans</span>
+              </a>
+              <a href="/blocks-rooms" class="btn btn-outline" style="justify-content:center; padding:1rem; flex-direction:column; height:auto; gap:.25rem;">
+                <span style="font-size:1.5rem;">🏛️</span>
+                <span>Rooms</span>
+              </a>
+              <a href="/faculty-signin" class="btn btn-success" style="justify-content:center; padding:1rem; flex-direction:column; height:auto; gap:.25rem;">
+                <span style="font-size:1.5rem;">✅</span>
+                <span>Sign-In</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent plans -->
+      <div class="card">
+        <div class="card-header">
+          <span>📋</span>
+          <h3>Recent Seating Plans</h3>
+          <div class="actions">
+            <a href="/seating-generator" class="btn btn-primary btn-sm">+ New Plan</a>
+          </div>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Exam Type</th>
+                <th>Date</th>
+                <th>Years</th>
+                <th>Students</th>
+                <th>Rooms</th>
+                <th>Generated</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="recentPlansTable">
+              <tr><td colspan="8" class="loading"><div class="spinner"></div> Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/sidebar.js"></script>
+<script src="/js/common.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  // Date
+  document.getElementById('today-date').textContent =
+    new Date().toLocaleDateString('en-IN', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
+
+  // Auth
+  const user = await checkAuth();
+  if (user) document.getElementById('welcome-name').textContent = user.name;
+
+  // Load stats
+  const [students, faculty, rooms, plans] = await Promise.all([
+    API.get('/api/students/stats'),
+    API.get('/api/faculty/stats'),
+    API.get('/api/rooms'),
+    API.get('/api/seating')
+  ]);
+
+  if (students) {
+    const total = students.reduce((s,r) => s + r.count, 0);
+    document.getElementById('stat-students').textContent = total;
+
+    // Year breakdown
+    const yearLabels = {1:'1st Year',2:'2nd Year',3:'3rd Year',4:'4th Year'};
+    const colors = ['#dbeafe','#dcfce7','#fef9c3','#fce7f3'];
+    const textColors = ['#1e40af','#166534','#854d0e','#9d174d'];
+    document.getElementById('yearBreakdown').innerHTML = students.map((s,i) => `
+      <div style="display:flex; align-items:center; gap:.75rem; margin-bottom:.75rem;">
+        <div style="background:${colors[i]};color:${textColors[i]};
+          width:90px; padding:.3rem .6rem; border-radius:6px; font-size:.75rem; font-weight:600; text-align:center;">
+          ${yearLabels[s.year]}
+        </div>
+        <div style="flex:1; background:var(--gray-100); height:20px; border-radius:99px; overflow:hidden;">
+          <div style="height:100%;background:${textColors[i]};border-radius:99px;
+            width:${Math.round(s.count/total*100)}%;transition:width .5s ease;"></div>
+        </div>
+        <div style="font-weight:600; font-size:.9rem; width:40px; text-align:right;">${s.count}</div>
+      </div>
+    `).join('');
+  }
+
+  if (faculty) {
+    document.getElementById('stat-faculty').textContent = faculty.total;
+    document.getElementById('stat-faculty-avail').textContent = `${faculty.available} available`;
+  }
+
+  if (rooms) {
+    const totalCap = rooms.reduce((s,r) => s+r.capacity, 0);
+    document.getElementById('stat-rooms').textContent = rooms.length;
+    document.getElementById('stat-capacity').textContent = `${totalCap} total seats`;
+  }
+
+  if (plans) {
+    document.getElementById('stat-plans').textContent = plans.length;
+    const examTypes = {Mid:'badge-gold', Semester:'badge-navy'};
+    const yearMap = {1:'1st',2:'2nd',3:'3rd',4:'4th'};
+    document.getElementById('recentPlansTable').innerHTML = plans.length
+      ? plans.slice(0,5).map(p => {
+          const years = JSON.parse(p.years || '[]').map(y => yearMap[y]+'Y').join(', ');
+          return `<tr>
+            <td class="font-mono text-xs">#${p.id}</td>
+            <td><span class="badge ${examTypes[p.exam_type]||'badge-gray'}">${p.exam_type}</span></td>
+            <td>${formatDate(p.exam_date)}</td>
+            <td>${years}</td>
+            <td>${p.total_students||0}</td>
+            <td>${p.rooms_used||0}</td>
+            <td class="text-sm text-gray">${formatDateTime(p.created_at)}</td>
+            <td><a href="/seating-viewer?plan=${p.id}" class="btn btn-outline btn-sm">View</a></td>
+          </tr>`;
+        }).join('')
+      : '<tr><td colspan="8"><div class="empty-state"><div class="icon">📋</div><h3>No plans yet</h3><p>Generate your first seating plan</p></div></td></tr>';
+  }
+});
+</script>
+</body>
+</html>

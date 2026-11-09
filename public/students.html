@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Students — Seating System</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .branch-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: .75rem; margin-bottom: 1.5rem;
+    }
+    .bstat {
+      background: var(--white); border: 1px solid var(--gray-200);
+      border-radius: var(--radius); padding: .75rem 1rem;
+    }
+    .bstat .br-name { font-size: .72rem; font-weight: 700; color: var(--navy);
+      text-transform: uppercase; letter-spacing: .04em; margin-bottom: .25rem; }
+    .bstat .yr-row  { display: flex; justify-content: space-between;
+      font-size: .75rem; color: var(--gray-600); padding: .1rem 0; }
+    .bstat .yr-row span { font-weight: 600; color: var(--gray-900); }
+    .bstat .yr-total { border-top: 1px solid var(--gray-100); margin-top: .25rem;
+      padding-top: .25rem; font-size: .78rem; font-weight: 700; color: var(--navy); }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div class="main-content">
+    <div class="top-bar">
+      <h1 class="page-title">👨‍🎓 Student Management</h1>
+      <div class="top-bar-actions">
+        <button class="btn btn-outline btn-sm" onclick="toggleBranchStats()">📊 Branch Stats</button>
+        <button class="btn btn-outline btn-sm" onclick="openModal('csvModal')">📤 Upload CSV</button>
+        <button class="btn btn-primary btn-sm" onclick="openStudentModal()">+ Add Student</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- Year stats cards -->
+      <div class="stats-grid" id="studentStats"></div>
+
+      <!-- Branch × Year breakdown (toggleable) -->
+      <div id="branchStatsPanel" style="display:none; margin-bottom:1.5rem;">
+        <div style="font-size:.8rem; font-weight:600; color:var(--gray-600);
+             text-transform:uppercase; letter-spacing:.06em; margin-bottom:.75rem;">
+          Students per Branch per Year
+        </div>
+        <div class="branch-stat-grid" id="branchStatGrid"></div>
+      </div>
+
+      <!-- Filters + Table -->
+      <div class="card">
+        <div class="card-header">
+          <span>📋</span>
+          <h3>All Students</h3>
+          <div class="actions" id="totalCount"></div>
+        </div>
+        <div class="card-body" style="padding-bottom:0;">
+          <div class="search-bar">
+            <div class="search-input" style="max-width:250px;">
+              <input type="text" id="searchInput" placeholder="Search name or roll no...">
+            </div>
+            <select id="filterYear" style="max-width:130px;">
+              <option value="">All Years</option>
+              <option value="1">I Year</option>
+              <option value="2">II Year</option>
+              <option value="3">III Year</option>
+              <option value="4">IV Year</option>
+            </select>
+            <select id="filterBranch" style="max-width:140px;" id="filterBranch">
+              <option value="">All Branches</option>
+              <option>CSE</option>
+              <option>CSE-DS</option>
+              <option>CSE-AIML</option>
+              <option>CSE-AIDS</option>
+              <option>IT</option>
+              <option>ECE</option>
+              <option>EEE</option>
+              <option>Mechanical</option>
+              <option>Civil</option>
+              <option>MBA</option>
+            </select>
+            <button class="btn btn-outline btn-sm" onclick="loadStudents()">🔄 Refresh</button>
+          </div>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Roll Number</th>
+                <th>Name</th>
+                <th>Year</th>
+                <th>Branch</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="studentsTable">
+              <tr><td colspan="6"><div class="loading"><div class="spinner"></div></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Student Modal -->
+<div class="modal-overlay" id="studentModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="studentModalTitle">Add Student</h3>
+      <button class="modal-close" onclick="closeModal('studentModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="studentId">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Roll Number *</label>
+          <input type="text" id="rollNo" placeholder="e.g. 22911A0501" style="text-transform:uppercase;">
+        </div>
+        <div class="form-group">
+          <label>Year *</label>
+          <select id="studentYear">
+            <option value="">Select Year</option>
+            <option value="1">I Year</option>
+            <option value="2">II Year</option>
+            <option value="3">III Year</option>
+            <option value="4">IV Year</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Full Name *</label>
+        <input type="text" id="studentName" placeholder="Student full name">
+      </div>
+      <div class="form-group">
+        <label>Branch *</label>
+        <select id="studentBranch">
+          <option value="">Select Branch</option>
+          <option>CSE</option>
+          <option>CSE-DS</option>
+          <option>CSE-AIML</option>
+          <option>CSE-AIDS</option>
+          <option>IT</option>
+          <option>ECE</option>
+          <option>EEE</option>
+          <option>Mechanical</option>
+          <option>Civil</option>
+          <option>MBA</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('studentModal')">Cancel</button>
+      <button class="btn btn-primary" id="saveStudentBtn" onclick="saveStudent()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- CSV Upload Modal -->
+<div class="modal-overlay" id="csvModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>📤 Upload Students via CSV</h3>
+      <button class="modal-close" onclick="closeModal('csvModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--gray-50); border:1px solid var(--gray-200);
+           border-radius:var(--radius); padding:1rem; font-size:.82rem; margin-bottom:1rem;">
+        <strong>Expected CSV columns (any order):</strong><br>
+        <code style="font-size:.78rem;">roll_no, name, year, branch</code><br><br>
+        <strong>Branch names accepted:</strong><br>
+        <code style="font-size:.75rem;">
+          CSE, CSE-DS, CSE(DS), CSE-AIML, CSE(AIML), AI &amp; ML, CSE-AIDS, CSE(AIDS), AI &amp; DS,<br>
+          IT, ECE, EEE, Mechanical, MECH, Civil, CIV, MBA
+        </code><br><br>
+        <strong>Notes:</strong><br>
+        ✅ Extra empty columns (,,,,,) are handled automatically<br>
+        ✅ Roll numbers are auto-uppercased<br>
+        ✅ Duplicate roll numbers are silently skipped<br>
+        ✅ Year must be 1, 2, 3 or 4
+      </div>
+      <div class="form-group">
+        <label>Select CSV File</label>
+        <input type="file" id="csvFile" accept=".csv">
+      </div>
+      <div id="csvResult" style="display:none; padding:.75rem; border-radius:var(--radius);
+           font-size:.85rem; margin-top:.75rem;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('csvModal')">Close</button>
+      <button class="btn btn-primary" onclick="uploadCSV()">📤 Upload</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/sidebar.js"></script>
+<script src="/js/common.js"></script>
+<script>
+let allStudents    = [];
+let branchStatsOpen = false;
+
+// ── Load students table ────────────────────────────────────────
+async function loadStudents() {
+  const year   = document.getElementById('filterYear').value;
+  const branch = document.getElementById('filterBranch').value;
+  let url = '/api/students?';
+  if (year)   url += `year=${year}&`;
+  if (branch) url += `branch=${encodeURIComponent(branch)}`;
+
+  document.getElementById('studentsTable').innerHTML =
+    '<tr><td colspan="6"><div class="loading"><div class="spinner"></div></div></td></tr>';
+
+  try {
+    allStudents = await API.get(url) || [];
+    renderTable(allStudents);
+    await loadStats();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function loadStats() {
+  const stats = await API.get('/api/students/stats') || [];
+  const labels = {1:'I Year',2:'II Year',3:'III Year',4:'IV Year'};
+  const colors  = ['#dbeafe','#dcfce7','#fef9c3','#fce7f3'];
+  const text    = ['#1e40af','#166534','#854d0e','#9d174d'];
+  const total   = stats.reduce((s,r) => s + r.count, 0);
+  document.getElementById('studentStats').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-icon navy">👨‍🎓</div>
+      <div class="stat-info">
+        <div class="label">Total Students</div>
+        <div class="value">${total}</div>
+        <div class="sub">All years & branches</div>
+      </div>
+    </div>
+    ${stats.map((s,i) => `
+      <div class="stat-card">
+        <div class="stat-icon" style="background:${colors[i]};color:${text[i]}">${['I','II','III','IV'][i]}</div>
+        <div class="stat-info">
+          <div class="label">${labels[s.year]}</div>
+          <div class="value">${s.count}</div>
+          <div class="sub">students</div>
+        </div>
+      </div>`).join('')}
+  `;
+  document.getElementById('totalCount').innerHTML =
+    `<span class="text-sm text-gray">${allStudents.length} shown</span>`;
+}
+
+// ── Branch Stats panel ─────────────────────────────────────────
+async function toggleBranchStats() {
+  branchStatsOpen = !branchStatsOpen;
+  const panel = document.getElementById('branchStatsPanel');
+  panel.style.display = branchStatsOpen ? '' : 'none';
+  if (branchStatsOpen && !document.getElementById('branchStatGrid').childElementCount) {
+    await loadBranchStats();
+  }
+}
+
+async function loadBranchStats() {
+  const data = await API.get('/api/students/branch-stats') || [];
+  // Group by branch
+  const byBranch = {};
+  data.forEach(r => {
+    if (!byBranch[r.branch]) byBranch[r.branch] = {};
+    byBranch[r.branch][r.year] = r.count;
+  });
+
+  const yearLabels = {1:'Y1',2:'Y2',3:'Y3',4:'Y4'};
+  document.getElementById('branchStatGrid').innerHTML = Object.entries(byBranch)
+    .sort(([a],[b]) => a.localeCompare(b))
+    .map(([branch, years]) => {
+      const total = Object.values(years).reduce((s,c)=>s+c,0);
+      return `
+        <div class="bstat">
+          <div class="br-name">${branch}</div>
+          ${Object.entries(years).map(([y,c]) =>
+            `<div class="yr-row">${yearLabels[y] || y}<span>${c}</span></div>`
+          ).join('')}
+          <div class="yr-total">Total: ${total}</div>
+        </div>`;
+    }).join('');
+}
+
+// ── Table renderer ─────────────────────────────────────────────
+function renderTable(students) {
+  if (!students.length) {
+    document.getElementById('studentsTable').innerHTML =
+      '<tr><td colspan="6"><div class="empty-state"><div class="icon">👨‍🎓</div><h3>No students found</h3></div></td></tr>';
+    return;
+  }
+  document.getElementById('studentsTable').innerHTML = students.map((s, i) => `
+    <tr>
+      <td class="text-xs text-gray">${i+1}</td>
+      <td><span class="font-mono fw-600">${s.roll_no}</span></td>
+      <td>${s.name}</td>
+      <td>${yearBadge(s.year)}</td>
+      <td><span class="badge badge-navy">${s.branch}</span></td>
+      <td>
+        <button class="btn btn-outline btn-sm" onclick="editStudent(${s.id})">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteStudent(${s.id},'${s.name.replace(/'/g,'')}')">🗑️</button>
+      </td>
+    </tr>`).join('');
+}
+
+// ── Init ──────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  loadStudents();
+  document.getElementById('searchInput').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    renderTable(allStudents.filter(s =>
+      s.name.toLowerCase().includes(q) || s.roll_no.toLowerCase().includes(q)
+    ));
+  });
+  document.getElementById('filterYear').addEventListener('change', loadStudents);
+  document.getElementById('filterBranch').addEventListener('change', loadStudents);
+});
+
+// ── Student CRUD ──────────────────────────────────────────────
+function openStudentModal() {
+  ['studentId','rollNo','studentName'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('studentYear').value   = '';
+  document.getElementById('studentBranch').value = '';
+  document.getElementById('studentModalTitle').textContent = 'Add Student';
+  openModal('studentModal');
+}
+
+async function editStudent(id) {
+  try {
+    const s = await API.get(`/api/students/${id}`);
+    document.getElementById('studentId').value     = s.id;
+    document.getElementById('rollNo').value        = s.roll_no;
+    document.getElementById('studentName').value   = s.name;
+    document.getElementById('studentYear').value   = s.year;
+    document.getElementById('studentBranch').value = s.branch;
+    document.getElementById('studentModalTitle').textContent = 'Edit Student';
+    openModal('studentModal');
+  } catch(e) { showToast(e.message,'error'); }
+}
+
+async function saveStudent() {
+  const id     = document.getElementById('studentId').value;
+  const roll   = document.getElementById('rollNo').value.trim().toUpperCase();
+  const name   = document.getElementById('studentName').value.trim();
+  const year   = document.getElementById('studentYear').value;
+  const branch = document.getElementById('studentBranch').value;
+  if (!roll || !name || !year || !branch) return showToast('All fields are required','error');
+
+  setLoading('saveStudentBtn', true);
+  try {
+    if (id) { await API.put(`/api/students/${id}`,{roll_no:roll,name,year,branch}); showToast('Student updated','success'); }
+    else    { await API.post('/api/students',{roll_no:roll,name,year,branch}); showToast('Student added','success'); }
+    closeModal('studentModal'); loadStudents();
+  } catch(e) { showToast(e.message,'error'); }
+  finally { setLoading('saveStudentBtn',false); }
+}
+
+async function deleteStudent(id, name) {
+  if (!confirmAction(`Delete student "${name}"?`)) return;
+  try {
+    await API.delete(`/api/students/${id}`);
+    showToast('Student deleted','success'); loadStudents();
+  } catch(e) { showToast(e.message,'error'); }
+}
+
+// ── CSV Upload ────────────────────────────────────────────────
+async function uploadCSV() {
+  const file = document.getElementById('csvFile').files[0];
+  if (!file) return showToast('Please select a CSV file','error');
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const r = await fetch('/api/students/upload-csv', {
+      method:'POST', credentials:'include', body: formData
+    });
+    const data = await r.json();
+    const el   = document.getElementById('csvResult');
+    el.style.display = 'block';
+    if (r.ok) {
+      el.style.background = 'rgba(22,163,74,.1)';
+      el.style.color = 'var(--green)';
+      el.innerHTML = `✅ ${data.message}` +
+        (data.errors?.length ? `<br><small style="color:#999">Note: ${data.errors.join(', ')}</small>` : '');
+      loadStudents();
+    } else {
+      el.style.background = 'rgba(220,38,38,.1)';
+      el.style.color = 'var(--red)';
+      el.textContent = '❌ ' + data.error;
+    }
+  } catch(e) { showToast(e.message,'error'); }
+}
+</script>
+</body>
+</html>

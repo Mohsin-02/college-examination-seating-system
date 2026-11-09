@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seating Plan Viewer</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    /* ── Viewer-specific styles ───────────────── */
+    .plan-row {
+      background: var(--white); border: 1px solid var(--gray-200);
+      border-radius: var(--radius-lg); padding: 1.25rem 1.5rem;
+      display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+      cursor: pointer; transition: var(--transition); margin-bottom: .75rem;
+    }
+    .plan-row:hover { border-color: var(--navy); box-shadow: var(--shadow-md); }
+    .plan-icon { width:48px;height:48px;background:var(--navy);border-radius:10px;
+      display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0; }
+    .plan-meta-bar {
+      background: linear-gradient(135deg, var(--navy), var(--navy-light));
+      border-radius: var(--radius-lg); padding: 1.25rem 2rem;
+      color: white; display: flex; align-items: center; gap: 2rem;
+      flex-wrap: wrap; margin-bottom: 1.25rem;
+    }
+    .meta-item .lbl { font-size:.68rem;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.06em; }
+    .meta-item .val { font-size:1rem; font-weight:600; }
+
+    /* Edit meta inline */
+    .edit-meta-form {
+      display: none; background: var(--gray-50); border: 1px solid var(--gray-200);
+      border-radius: var(--radius); padding: 1rem; margin-bottom: 1.25rem;
+    }
+    .edit-meta-form.show { display: block; }
+
+    /* View mode tabs */
+    .view-tabs { display:flex; gap:.5rem; margin-bottom:1.25rem; }
+    .view-tab {
+      padding:.5rem 1.25rem; border-radius: var(--radius);
+      border: 1.5px solid var(--gray-200); background: var(--white);
+      cursor: pointer; font-weight: 600; font-size: .875rem;
+      transition: var(--transition);
+    }
+    .view-tab.active { background: var(--navy); color: white; border-color: var(--navy); }
+
+    /* ══ SUMMARY SHEET ══════════════════════════════════════ */
+    .summary-print-header {
+      text-align:center; padding-bottom:1rem;
+      border-bottom: 2px solid var(--navy);
+      margin-bottom: 1.5rem; display:none;
+    }
+    .summary-print-header h1 { font-family:'Playfair Display',serif; font-size:1.3rem; color:var(--navy); }
+    .summary-print-header .sub { font-size:.85rem; color:var(--gray-600); margin-top:.2rem; }
+    .summary-print-header .blocks-used {
+      display:inline-block; margin-top:.4rem;
+      font-weight:600; font-size:.8rem; color:var(--gray-700);
+    }
+
+    #summaryTable th { font-size: .72rem; }
+    #summaryTable td.branch-col { font-size: .8rem; padding: .4rem .75rem; }
+    #summaryTable .ht-range { font-family: 'JetBrains Mono', monospace; font-size:.78rem; }
+    #summaryTable tr.room-first-row td { border-top: 2px solid var(--gray-200); }
+    #summaryTable tr.room-first-row .room-cell { font-weight: 700; font-size: .92rem; color: var(--navy); }
+
+    /* ══ ROOM SHEET (Faculty Print) ═════════════════════════ */
+    .room-sheet {
+      page-break-inside: avoid; break-inside: avoid;
+      margin-bottom: 2rem;
+      border: 1.5px solid var(--gray-300);
+      border-radius: var(--radius-lg); overflow: hidden;
+    }
+    /* Print header inside room sheet */
+    .rs-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      padding: .75rem 1.25rem;
+      border-bottom: 1.5px solid var(--gray-300);
+      background: var(--gray-50);
+    }
+    .rs-logo { font-weight: 700; font-size: .8rem; color: var(--navy); }
+    .rs-logo span { display:block; font-size:.65rem; color:var(--gray-600); font-weight:400; }
+    .rs-title { text-align:center; flex:1; padding: 0 1rem; }
+    .rs-title h3 { font-family:'Playfair Display',serif; font-size:.95rem; color:var(--navy); }
+    .rs-title p  { font-size:.75rem; color:var(--gray-600); margin-top:.1rem; }
+    .rs-code { font-size:.75rem; text-align:right; }
+    .rs-code strong { display:block; }
+
+    /* Room info bar */
+    .rs-room-bar {
+      background: var(--navy); color: white;
+      padding: .6rem 1.25rem;
+      display: flex; gap: 2rem; flex-wrap: wrap; font-size: .82rem;
+    }
+    .rs-room-bar strong { color: var(--gold); }
+
+    /* Bench grid table */
+    .bench-table { width:100%; border-collapse: collapse; font-size: .78rem; }
+    .bench-table th {
+      background: var(--navy); color: white; padding: .5rem .75rem;
+      text-align: center; font-size: .7rem; letter-spacing: .04em;
+      font-weight: 600; text-transform: uppercase; white-space: nowrap;
+    }
+    .bench-table th.window-col { background: #1a3a6b; }
+    .bench-table th.door-col   { background: #3d1a6b; }
+    .bench-table td {
+      padding: .45rem .6rem; border: 1px solid var(--gray-200);
+      vertical-align: middle; text-align: center;
+    }
+    .bench-table td.seat-num-col {
+      background: var(--gray-50); color: var(--gray-500);
+      font-weight: 700; font-size: .7rem; white-space: nowrap;
+      font-family: 'JetBrains Mono', monospace; width: 32px;
+    }
+    .bench-cell { line-height: 1.3; }
+    .bench-cell .ht { font-family:'JetBrains Mono',monospace; font-weight:600;
+      color: var(--gray-900); font-size: .77rem; white-space: nowrap; }
+    .bench-cell .yr { font-size: .65rem; color: var(--gray-500); }
+    .bench-cell .divider { color:var(--gray-300); margin: 1px 0; font-size:.7rem; }
+    .bench-cell.empty { color: var(--gray-300); }
+    .bench-table tr:nth-child(even) td { background: #fafafa; }
+    .bench-table tr:nth-child(even) td.seat-num-col { background: var(--gray-100); }
+
+    /* Attendance row at bottom */
+    .rs-footer { padding: .75rem 1.25rem; font-size: .78rem; color: var(--gray-700); }
+    .attendance-row {
+      display: flex; gap: 2rem; margin-bottom: .6rem;
+      padding: .5rem 0; border-top: 1px solid var(--gray-200);
+    }
+    .att-item { flex:1; }
+    .att-item .att-label { font-size:.68rem; color:var(--gray-500); text-transform:uppercase; letter-spacing:.05em; }
+    .att-item .att-line  { border-bottom: 1px solid var(--gray-400); height: 20px; margin-top:.15rem; }
+    .invig-row { display:flex; gap:3rem; margin-top: .5rem; }
+    .invig-box { flex:1; }
+    .invig-box .att-label { font-size:.68rem; color:var(--gray-500); margin-bottom:.2rem; }
+    .invig-box .att-line  { border-bottom: 1px solid var(--gray-400); height: 28px; }
+    .rs-sign { display:flex; justify-content:flex-end; margin-top: .75rem; }
+    .sign-block { text-align:center; }
+    .sign-block .sign-line { width:160px; border-bottom: 1px solid var(--gray-600); margin-bottom:.2rem; }
+    .sign-block p { font-size:.72rem; color:var(--gray-600); }
+
+    .note-text { font-size:.72rem; color:var(--gray-600); font-style:italic; margin-top:.4rem; }
+
+    /* ── Print media ───────────────────────────────────────── */
+    @media print {
+      .no-print, .sidebar, .top-bar { display: none !important; }
+      .main-content { margin-left: 0 !important; }
+      .content { padding: 0 !important; }
+      body { background: white !important; font-size: 10pt; }
+      .summary-print-header { display: block !important; }
+      .room-sheet { border: 1.5px solid #333; page-break-after: always; margin-bottom:0; }
+      .room-sheet:last-child { page-break-after: avoid; }
+      .bench-table { font-size: 9pt; }
+      .bench-table th { font-size: 8pt; }
+      .bench-cell .ht { font-size: 8.5pt; }
+      .plan-meta-bar, .view-tabs, .edit-meta-form { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div class="main-content">
+    <div class="top-bar no-print">
+      <h1 class="page-title">📋 Seating Plan Viewer</h1>
+      <div class="top-bar-actions">
+        <a href="/seating-generator" class="btn btn-primary btn-sm">⚙️ New Plan</a>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ── Plan list (when no plan open) ──────────────────── -->
+      <div id="listView">
+        <div class="card">
+          <div class="card-header">
+            <span>📋</span><h3>All Seating Plans</h3>
+            <div class="actions">
+              <button class="btn btn-outline btn-sm" onclick="loadList()">🔄</button>
+            </div>
+          </div>
+          <div class="card-body" id="listBody">
+            <div class="loading"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Plan detail view ───────────────────────────────── -->
+      <div id="detailView" style="display:none;">
+
+        <!-- Meta bar -->
+        <div class="plan-meta-bar no-print">
+          <div class="meta-item"><div class="lbl">Exam</div><div class="val" id="metaType">—</div></div>
+          <div class="meta-item"><div class="lbl">Date</div><div class="val" id="metaDate">—</div></div>
+          <div class="meta-item"><div class="lbl">Years</div><div class="val" id="metaYears">—</div></div>
+          <div class="meta-item"><div class="lbl">Students</div><div class="val" id="metaStudents">—</div></div>
+          <div class="meta-item"><div class="lbl">Rooms</div><div class="val" id="metaRooms">—</div></div>
+          <div style="margin-left:auto; display:flex; gap:.5rem; flex-wrap:wrap;" class="no-print">
+            <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:white;"
+              onclick="toggleEditMeta()">✏️ Edit</button>
+            <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:white;"
+              onclick="showListView()">← Back</button>
+            <button class="btn btn-gold btn-sm" onclick="printSummary()">🖨️ Summary</button>
+            <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:white;"
+              onclick="printRoomSheets()">📄 Room Sheets</button>
+            <button class="btn btn-danger btn-sm" onclick="deletePlan()">🗑️</button>
+          </div>
+        </div>
+
+        <!-- Edit meta form -->
+        <div class="edit-meta-form no-print" id="editMetaForm">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Exam Full Name</label>
+              <input type="text" id="editExamName">
+            </div>
+            <div class="form-group">
+              <label>Exam Date</label>
+              <input type="date" id="editExamDate">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Mid Type</label>
+              <select id="editMidType">
+                <option value="Mid-1">Mid-1</option>
+                <option value="Mid-2">Mid-2</option>
+                <option value="Mid-3">Mid-3</option>
+                <option value="Semester">Semester</option>
+                <option value="Supplementary">Supplementary</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Faculty per Room</label>
+              <select id="editFacPerRoom">
+                <option value="1">1 Faculty</option>
+                <option value="2">2 Faculty</option>
+                <option value="3">3 Faculty</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:flex; gap:.75rem;">
+            <button class="btn btn-primary" onclick="saveMeta()">💾 Save Changes</button>
+            <button class="btn btn-outline" onclick="toggleEditMeta()">Cancel</button>
+          </div>
+        </div>
+
+        <!-- View mode tabs -->
+        <div class="view-tabs no-print">
+          <div class="view-tab active" onclick="switchView('summary')">📊 Summary Sheet</div>
+          <div class="view-tab" onclick="switchView('rooms')">🚪 Room-wise Sheets</div>
+        </div>
+
+        <!-- ══ SUMMARY VIEW ══ -->
+        <div id="summaryView">
+          <div class="summary-print-header" id="summaryPrintHeader">
+            <div style="font-size:1.5rem;">🎓</div>
+            <h1 id="spExamName">—</h1>
+            <div class="sub" id="spBlocks">—</div>
+            <div class="sub" id="spDate">—</div>
+          </div>
+
+          <div class="card">
+            <div class="table-container">
+              <table id="summaryTable">
+                <thead>
+                  <tr>
+                    <th>S.No</th>
+                    <th>Room No</th>
+                    <th>Branch</th>
+                    <th>H.T. Number (Range)</th>
+                    <th>Students (Branch-wise)</th>
+                    <th class="no-print">Total</th>
+                  </tr>
+                </thead>
+                <tbody id="summaryBody">
+                  <tr><td colspan="6"><div class="loading"><div class="spinner"></div></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ ROOM SHEETS VIEW ══ -->
+        <div id="roomsView" style="display:none;">
+          <div id="roomSheets">
+            <div class="loading"><div class="spinner"></div></div>
+          </div>
+        </div>
+
+      </div><!-- /detailView -->
+    </div>
+  </div>
+</div>
+
+<script src="/js/sidebar.js"></script>
+<script src="/js/common.js"></script>
+<script>
+let currentPlanId = null;
+let currentPlan   = null;
+let currentRooms  = [];
+let currentSummary = [];
+const yearMap = {1:'I Year',2:'II Year',3:'III Year',4:'IV Year'};
+const yearOrd = {1:'I',2:'II',3:'III',4:'IV'};
+
+// ──────────────────────────────────────────────────────────
+// LIST VIEW
+// ──────────────────────────────────────────────────────────
+async function loadList() {
+  document.getElementById('listBody').innerHTML =
+    '<div class="loading"><div class="spinner"></div></div>';
+  const plans = await API.get('/api/seating') || [];
+  if (!plans.length) {
+    document.getElementById('listBody').innerHTML = `
+      <div class="empty-state">
+        <div class="icon">📋</div><h3>No plans yet</h3>
+        <a href="/seating-generator" class="btn btn-primary" style="margin-top:1rem;">⚙️ Generate Plan</a>
+      </div>`;
+    return;
+  }
+  const typeColors = { Mid:'badge-gold', Semester:'badge-navy' };
+  document.getElementById('listBody').innerHTML = plans.map(p => {
+    const years = JSON.parse(p.years||'[]').map(y=>yearOrd[y]+'Y').join(', ');
+    return `
+      <div class="plan-row" onclick="loadPlan(${p.id})">
+        <div class="plan-icon">${p.exam_type==='Semester'?'📚':'📝'}</div>
+        <div>
+          <div style="font-weight:600; color:var(--gray-900); font-size:.95rem;">
+            ${p.exam_name || p.mid_type || p.exam_type}
+          </div>
+          <div style="font-size:.8rem; color:var(--gray-600); margin-top:.15rem;">
+            ${formatDate(p.exam_date)} &nbsp;·&nbsp; Years: ${years}
+            &nbsp;·&nbsp; ${p.total_students||0} students
+            &nbsp;·&nbsp; ${p.rooms_used||0} rooms
+          </div>
+        </div>
+        <div style="margin-left:auto; display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;">
+          <span class="badge ${typeColors[p.exam_type]||'badge-gray'}">${p.mid_type||p.exam_type}</span>
+          <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();loadPlan(${p.id})">View</button>
+          <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deletePlanById(${p.id})">🗑️</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function showListView() {
+  document.getElementById('listView').style.display   = '';
+  document.getElementById('detailView').style.display = 'none';
+  window.history.replaceState({}, '', '/seating-viewer');
+  loadList();
+}
+
+// ──────────────────────────────────────────────────────────
+// PLAN DETAIL
+// ──────────────────────────────────────────────────────────
+async function loadPlan(planId) {
+  currentPlanId = planId;
+  document.getElementById('listView').style.display   = 'none';
+  document.getElementById('detailView').style.display = '';
+  document.getElementById('summaryBody').innerHTML =
+    '<tr><td colspan="6"><div class="loading"><div class="spinner"></div></div></td></tr>';
+  document.getElementById('roomSheets').innerHTML =
+    '<div class="loading"><div class="spinner"></div></div>';
+
+  try {
+    const data = await API.get(`/api/seating/${planId}`);
+    currentPlan    = data.plan;
+    currentRooms   = data.rooms;
+    currentSummary = data.summary;
+
+    // Update meta bar
+    const years = JSON.parse(currentPlan.years||'[]').map(y=>yearMap[y]).join(', ');
+    document.getElementById('metaType').textContent     = currentPlan.exam_name || currentPlan.mid_type || currentPlan.exam_type;
+    document.getElementById('metaDate').textContent     = formatDate(currentPlan.exam_date);
+    document.getElementById('metaYears').textContent    = years;
+    document.getElementById('metaStudents').textContent = currentRooms.reduce((s,r)=>s+r.students_assigned,0);
+    document.getElementById('metaRooms').textContent    = currentRooms.length;
+
+    // Populate edit form
+    document.getElementById('editExamName').value  = currentPlan.exam_name || '';
+    document.getElementById('editExamDate').value  = currentPlan.exam_date || '';
+    document.getElementById('editMidType').value   = currentPlan.mid_type || currentPlan.exam_type;
+    document.getElementById('editFacPerRoom').value = currentPlan.faculty_per_room || 2;
+
+    // Print header
+    const blocks = [...new Set(currentRooms.map(r => r.block_name))].sort().join(', ');
+    document.getElementById('spExamName').textContent = currentPlan.exam_name || `${currentPlan.mid_type} Examination`;
+    document.getElementById('spBlocks').textContent   = `( ${blocks} BLOCKS )`;
+    document.getElementById('spDate').textContent     = `Date: ${formatDate(currentPlan.exam_date)}`;
+
+    renderSummaryTable();
+    renderRoomSheets();
+
+    window.history.replaceState({}, '', `/seating-viewer?plan=${planId}`);
+  } catch(e) {
+    showToast(e.message, 'error');
+  }
+}
+
+// ──────────────────────────────────────────────────────────
+// SUMMARY TABLE
+// ──────────────────────────────────────────────────────────
+function renderSummaryTable() {
+  if (!currentSummary.length) {
+    document.getElementById('summaryBody').innerHTML =
+      '<tr><td colspan="6"><div class="empty-state">No data</div></td></tr>';
+    return;
+  }
+
+  let html = '';
+  currentSummary.forEach(room => {
+    room.branches.forEach((br, i) => {
+      const isFirst = i === 0;
+      html += `
+        <tr class="${isFirst ? 'room-first-row' : ''}">
+          <td ${isFirst ? `rowspan="${room.branches.length}"` : 'style="display:none"'}
+              class="room-cell" style="text-align:center; vertical-align:middle;">${isFirst ? room.sno : ''}</td>
+          <td ${isFirst ? `rowspan="${room.branches.length}"` : 'style="display:none"'}
+              class="room-cell" style="text-align:center; vertical-align:middle;">${isFirst ? room.room_no : ''}</td>
+          <td class="branch-col"><span class="badge badge-navy">${br.branch}</span></td>
+          <td class="ht-range">${br.range}</td>
+          <td style="text-align:center;">${br.count}</td>
+          <td ${isFirst ? `rowspan="${room.branches.length}"` : 'style="display:none"'}
+              class="no-print" style="text-align:center; font-weight:700; vertical-align:middle; color:var(--navy);">
+              ${isFirst ? room.total : ''}</td>
+        </tr>`;
+    });
+  });
+
+  // Total row
+  const grand = currentSummary.reduce((s,r)=>s+r.total, 0);
+  html += `
+    <tr style="background:var(--navy); color:white;">
+      <td colspan="4" style="text-align:right; font-weight:700; padding:.75rem 1rem;">TOTAL</td>
+      <td style="text-align:center; font-weight:700;">${grand}</td>
+      <td class="no-print" style="text-align:center; font-weight:700;">${grand}</td>
+    </tr>`;
+
+  document.getElementById('summaryBody').innerHTML = html;
+}
+
+// ──────────────────────────────────────────────────────────
+// ROOM SHEETS (faculty print format — matching PDF)
+// ──────────────────────────────────────────────────────────
+function renderRoomSheets() {
+  if (!currentRooms.length) {
+    document.getElementById('roomSheets').innerHTML =
+      '<div class="empty-state"><div class="icon">🚪</div><h3>No rooms</h3></div>';
+    return;
+  }
+
+  const examName = currentPlan.exam_name || `${currentPlan.mid_type} Examination`;
+  const examDate = formatDate(currentPlan.exam_date);
+  const isMid    = currentPlan.exam_type !== 'Semester';
+
+  document.getElementById('roomSheets').innerHTML = currentRooms.map(room => {
+    const numRows = room.num_rows || 8;
+    const numCols = room.num_cols || 4;
+    const totalStudents = room.students_assigned;
+    const colLabels = buildColLabels(numCols);
+
+    // Build grid: row → col → { L?, R?, C? }
+    const grid = room.grid || {};
+
+    // Build serpentine seat number map: (col,row) → display seat number
+    function serpSeat(col, row) { // col,row: 1-indexed
+      const c0 = col - 1; // 0-indexed
+      const r0 = row - 1;
+      const base = c0 * numRows;
+      return (c0 % 2 === 0) ? base + r0 + 1 : base + (numRows - r0);
+    }
+
+    // Table rows: serpentine means Col 0 goes 1→numRows, Col 1 goes 2*numRows→numRows+1
+    // We display each physical row of benches as a table row
+    let tableRows = '';
+    for (let r = 1; r <= numRows; r++) {
+      tableRows += '<tr>';
+      for (let c = 1; c <= numCols; c++) {
+        const sn = serpSeat(c, r);
+        tableRows += `<td class="seat-num-col">${sn}</td>`;
+        const bench = (grid[r] && grid[r][c]) || {};
+        if (isMid) {
+          const L = bench.L, R = bench.R;
+          tableRows += `<td>
+            <div class="bench-cell">
+              ${L ? `<div class="ht">${L.roll_no}</div><div class="yr">${L.branch}·${yearOrd[L.year]}Y</div>` : ''}
+              ${(L&&R) ? '<div class="divider">──</div>' : ''}
+              ${R ? `<div class="ht">${R.roll_no}</div><div class="yr">${R.branch}·${yearOrd[R.year]}Y</div>` : ''}
+              ${(!L&&!R) ? '<span class="empty">—</span>' : ''}
+            </div>
+          </td>`;
+        } else {
+          const S = bench.C;
+          tableRows += `<td>
+            <div class="bench-cell">
+              ${S ? `<div class="ht">${S.roll_no}</div><div class="yr">${S.branch}·${yearOrd[S.year]}Y</div>` : '<span class="empty">—</span>'}
+            </div>
+          </td>`;
+        }
+      }
+      tableRows += '</tr>';
+    }
+
+    // Header columns
+    const thCols = colLabels.map((lbl,i) => `
+      <th class="${i===0?'window-col':i===numCols-1?'door-col':''}" colspan="2">${lbl}</th>
+    `).join('');
+
+    // Faculty names
+    const facNames = room.faculty && room.faculty.length
+      ? room.faculty.map((f,i) => `${i+1}. ${f.name} (${f.emp_id})`).join('  |  ')
+      : 'Not Assigned';
+
+    return `
+      <div class="room-sheet">
+        <!-- Header -->
+        <div class="rs-header">
+          <div class="rs-logo">
+            🎓 VIDYA JYOTHI INSTITUTE OF TECHNOLOGY
+            <span>AN AUTONOMOUS INSTITUTION</span>
+            <span>Aziz Nagar Gate, Chilkur Balaji Road, Hyderabad – 500 075</span>
+          </div>
+          <div class="rs-title">
+            <h3>SEATING PLAN</h3>
+            <p>${examName}</p>
+            <p>Date: ${examDate} &nbsp;|&nbsp; Subject: ___________________</p>
+          </div>
+          <div class="rs-code">College Code: 91<strong>Room No: ${room.room_no}</strong></div>
+        </div>
+
+        <!-- Room info -->
+        <div class="rs-room-bar">
+          <span>🚪 Room <strong>${room.room_no}</strong></span>
+          <span>🏛️ Block <strong>${room.block_name}</strong></span>
+          <span>🪑 Benches: <strong>${numRows} rows × ${numCols} cols</strong></span>
+          <span>👨‍🎓 Seated: <strong>${totalStudents}</strong></span>
+          <span>👨‍🏫 Invigilator(s): <strong>${facNames}</strong></span>
+        </div>
+
+        <!-- Bench grid table -->
+        <table class="bench-table">
+          <thead>
+            <tr>
+              ${colLabels.map((lbl,i) => `
+                <th style="width:32px;background:#555;"></th>
+                <th class="${i===0?'window-col':i===numCols-1?'door-col':''}">${lbl}</th>
+              `).join('')}
+            </tr>
+            <tr>
+              ${Array.from({length:numCols}).map((_,i)=>`
+                <th style="width:32px;background:#555;font-size:.62rem;">S.No</th>
+                <th style="font-size:.65rem;">${isMid?'Left H.T. / Right H.T.':'H.T. Number'}</th>
+              `).join('')}
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+
+        <!-- Footer: attendance + signatures -->
+        <div class="rs-footer">
+          <div class="attendance-row">
+            <div class="att-item">
+              <div class="att-label">No. of Registered</div>
+              <div style="font-weight:700; font-size:1rem; color:var(--navy);">${totalStudents}</div>
+            </div>
+            <div class="att-item">
+              <div class="att-label">No. of Absents</div>
+              <div class="att-line"></div>
+            </div>
+            <div class="att-item">
+              <div class="att-label">No. of Present</div>
+              <div class="att-line"></div>
+            </div>
+          </div>
+          <div class="note-text">
+            ★ Note: Cross the box containing the Hall Ticket number when the candidate is absent.
+          </div>
+          <div class="invig-row">
+            <div class="invig-box">
+              <div class="att-label">Name &amp; Signature of Invigilators</div>
+              <div class="att-line" style="margin-top:.25rem;">1. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+              <div class="att-line" style="margin-top:.5rem;">2. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+            </div>
+            <div class="rs-sign">
+              <div class="sign-block">
+                <div class="sign-line"></div>
+                <p>Controller of Examinations</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// Build column label names (window→door)
+function buildColLabels(numCols) {
+  if (numCols === 3) return ['NEXT TO WINDOW (ROW I)', 'ROW II', 'NEAR TO DOOR (ROW III)'];
+  if (numCols === 4) return ['WINDOW SIDE (ROW I)', 'ROW II', 'ROW III', 'DOOR SIDE (ROW IV)'];
+  if (numCols === 5) return ['ROW I (Window)', 'ROW II', 'ROW III', 'ROW IV', 'ROW V (Door)'];
+  return Array.from({length:numCols}, (_,i) => `ROW ${['I','II','III','IV','V','VI'][i]||i+1}`);
+}
+
+// ──────────────────────────────────────────────────────────
+// VIEW MODE SWITCHING
+// ──────────────────────────────────────────────────────────
+function switchView(mode) {
+  document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('summaryView').style.display = mode === 'summary' ? '' : 'none';
+  document.getElementById('roomsView').style.display   = mode === 'rooms'   ? '' : 'none';
+}
+
+// ──────────────────────────────────────────────────────────
+// PRINT FUNCTIONS
+// ──────────────────────────────────────────────────────────
+function printSummary() {
+  document.getElementById('summaryView').style.display = '';
+  document.getElementById('roomsView').style.display   = 'none';
+  document.getElementById('summaryPrintHeader').style.display = 'block';
+  window.print();
+  document.getElementById('summaryPrintHeader').style.display = 'none';
+}
+
+function printRoomSheets() {
+  document.getElementById('summaryView').style.display = 'none';
+  document.getElementById('roomsView').style.display   = '';
+  window.print();
+  document.getElementById('summaryView').style.display = '';
+}
+
+// ──────────────────────────────────────────────────────────
+// EDIT META
+// ──────────────────────────────────────────────────────────
+function toggleEditMeta() {
+  document.getElementById('editMetaForm').classList.toggle('show');
+}
+
+async function saveMeta() {
+  try {
+    await API.patch(`/api/seating/${currentPlanId}/meta`, {
+      exam_name:       document.getElementById('editExamName').value,
+      exam_date:       document.getElementById('editExamDate').value,
+      mid_type:        document.getElementById('editMidType').value,
+      faculty_per_room: Number(document.getElementById('editFacPerRoom').value)
+    });
+    showToast('Plan updated', 'success');
+    document.getElementById('editMetaForm').classList.remove('show');
+    loadPlan(currentPlanId);
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+// ──────────────────────────────────────────────────────────
+// DELETE
+// ──────────────────────────────────────────────────────────
+async function deletePlan() {
+  if (!confirmAction('Delete this seating plan permanently?')) return;
+  try {
+    await API.delete(`/api/seating/${currentPlanId}`);
+    showToast('Plan deleted', 'success');
+    showListView();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function deletePlanById(id) {
+  if (!confirmAction('Delete this plan?')) return;
+  try { await API.delete(`/api/seating/${id}`); showToast('Deleted','success'); loadList(); }
+  catch(e) { showToast(e.message,'error'); }
+}
+
+// ──────────────────────────────────────────────────────────
+// INIT
+// ──────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  await checkAuth();
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('plan')) {
+    await loadPlan(params.get('plan'));
+    if (params.get('print') === 'summary') printSummary();
+  } else {
+    loadList();
+  }
+});
+</script>
+</body>
+</html>
