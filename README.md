@@ -50,6 +50,7 @@ Open your browser: **http://localhost:3000**
 | Password | `admin123` |
 
 ---
+```
 ## 📁 Project Structure
 
 ```text
@@ -64,7 +65,7 @@ college-examination-seating-system/
 ├── README.md
 │
 ├── data/
-│   └── seating.db              # Automatically generated SQLite database
+│   └── seating.db                 # Automatically generated SQLite database
 │
 ├── routes/
 │   ├── auth.js
@@ -75,7 +76,7 @@ college-examination-seating-system/
 │   └── seating.js
 │
 ├── seed-data/
-│   └── real_students.js        # AI-generated sample student records
+│   └── real_students.js           # AI-generated sample student records
 │
 ├── public/
 │   ├── index.html
@@ -98,7 +99,6 @@ college-examination-seating-system/
     ├── 04-faculty-management.png
     └── 05-block-room-management.png
 ```
-
 ---
 
 ## 📌 Modules Overview
